@@ -21,7 +21,7 @@ A production-ready local B2B Media Sales CRM & Inventory Booking System explicit
 
 - **Framework**: Next.js 16 (App Router, React 19, TypeScript)
 - **Styling**: Tailwind CSS with authentic Jazeera Airways Navy (`#002B66`), Sky Blue (`#00A3E0`), and Sun Yellow (`#FFC72C`)
-- **Database & ORM**: Self-contained SQLite with Prisma ORM
+- **Database & ORM**: Supabase PostgreSQL with Prisma ORM (Transaction & Session Pooler)
 - **Table Engine**: TanStack Table (v8) for high-density inventory exploration
 - **PDF Generation**: `jspdf` & `jspdf-autotable`
 - **Icons & Effects**: `lucide-react`, `canvas-confetti`
