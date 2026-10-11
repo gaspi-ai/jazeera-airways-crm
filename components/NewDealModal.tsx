@@ -23,6 +23,8 @@ export function NewDealModal({ isOpen, onClose, onDealCreated }: NewDealModalPro
   const [flammabilityCertified, setFlammabilityCertified] = useState(false);
   const [scannerChecked, setScannerChecked] = useState(false);
   const [notes, setNotes] = useState('');
+  const [discountType, setDiscountType] = useState<'NONE' | 'PERCENTAGE' | 'FIXED_AMOUNT'>('NONE');
+  const [discountValue, setDiscountValue] = useState<number>(0);
 
   // Selected asset booking line items
   const [bookingItems, setBookingItems] = useState<
@@ -121,7 +123,14 @@ export function NewDealModal({ isOpen, onClose, onDealCreated }: NewDealModalPro
     setBookingItems(bookingItems.filter((_, idx) => idx !== index));
   };
 
-  const totalCalculatedKWD = bookingItems.reduce((acc, curr) => acc + (Number(curr.rateKWD) || 0), 0);
+  const grossValueKWD = bookingItems.reduce((acc, curr) => acc + (Number(curr.rateKWD) || 0), 0);
+  let discountAmountKWD = 0;
+  if (discountType === 'PERCENTAGE' && discountValue > 0) {
+    discountAmountKWD = Math.round(grossValueKWD * (discountValue / 100));
+  } else if (discountType === 'FIXED_AMOUNT' && discountValue > 0) {
+    discountAmountKWD = Math.min(grossValueKWD, discountValue);
+  }
+  const netValueKWD = Math.max(0, grossValueKWD - discountAmountKWD);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -149,6 +158,8 @@ export function NewDealModal({ isOpen, onClose, onDealCreated }: NewDealModalPro
         flammabilityCertified,
         scannerChecked,
         notes,
+        discountType,
+        discountValue,
         bookingSlots: bookingItems.map((item) => ({
           assetId: item.assetId,
           startDate: targetStartDate,
@@ -423,14 +434,99 @@ export function NewDealModal({ isOpen, onClose, onDealCreated }: NewDealModalPro
                   );
                 })}
 
-                {/* Total box */}
-                <div className="rounded-xl bg-[#002B66] text-white p-4 flex items-center justify-between">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-sky-200">
-                    Calculated Total Contract Value
-                  </span>
-                  <span className="text-xl font-black text-[#FFC72C]">
-                    {totalCalculatedKWD.toLocaleString()} KWD
-                  </span>
+                {/* Commercial Discount Engine */}
+                <div className="p-4 rounded-xl border border-sky-100 dark:border-sky-950 bg-sky-50/60 dark:bg-sky-950/20 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
+                      Commercial Discount & Agency Margins
+                    </span>
+
+                    {/* Quick Preset Buttons */}
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] text-slate-500 font-medium">Presets:</span>
+                      {[
+                        { label: 'Agency 15%', type: 'PERCENTAGE', val: 15 },
+                        { label: '10%', type: 'PERCENTAGE', val: 10 },
+                        { label: '5%', type: 'PERCENTAGE', val: 5 },
+                        { label: 'None', type: 'NONE', val: 0 },
+                      ].map((p, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => {
+                            setDiscountType(p.type as any);
+                            setDiscountValue(p.val);
+                          }}
+                          className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all cursor-pointer ${
+                            discountType === p.type && discountValue === p.val
+                              ? 'bg-[#002B66] text-white'
+                              : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
+                          }`}
+                        >
+                          {p.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                        Discount Mechanism
+                      </label>
+                      <select
+                        value={discountType}
+                        onChange={(e) => setDiscountType(e.target.value as any)}
+                        className="w-full text-xs rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 p-2 text-slate-900 dark:text-slate-100"
+                      >
+                        <option value="NONE">No Discount (Standard Rate Card)</option>
+                        <option value="PERCENTAGE">Percentage (%) Discount</option>
+                        <option value="FIXED_AMOUNT">Fixed Lump-Sum (KWD) Deduction</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                        {discountType === 'PERCENTAGE'
+                          ? 'Discount Percentage (%)'
+                          : discountType === 'FIXED_AMOUNT'
+                          ? 'Fixed Amount (KWD)'
+                          : 'Discount Value'}
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          disabled={discountType === 'NONE'}
+                          value={discountValue}
+                          onChange={(e) => setDiscountValue(Number(e.target.value))}
+                          min={0}
+                          max={discountType === 'PERCENTAGE' ? 100 : grossValueKWD}
+                          className="w-full text-xs rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 p-2 pr-10 font-bold text-slate-900 dark:text-slate-100 disabled:opacity-50"
+                        />
+                        <span className="absolute right-3 top-2 text-[11px] text-slate-400 font-bold">
+                          {discountType === 'PERCENTAGE' ? '%' : 'KWD'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Financial Summary */}
+                  <div className="pt-2 border-t border-sky-200 dark:border-sky-900 grid grid-cols-3 gap-2 text-center">
+                    <div className="p-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Gross Media</span>
+                      <span className="text-xs font-black text-slate-800 dark:text-slate-200">{grossValueKWD.toLocaleString()} KWD</span>
+                    </div>
+                    <div className="p-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                      <span className="text-[10px] uppercase font-bold text-red-500 block">Discount</span>
+                      <span className="text-xs font-black text-red-600 dark:text-red-400">
+                        {discountAmountKWD > 0 ? `-${discountAmountKWD.toLocaleString()} KWD` : '0 KWD'}
+                      </span>
+                    </div>
+                    <div className="p-2 rounded-lg bg-[#002B66] text-white">
+                      <span className="text-[10px] uppercase font-bold text-sky-200 block">Net Payable</span>
+                      <span className="text-xs font-black text-[#FFC72C]">{netValueKWD.toLocaleString()} KWD</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}

@@ -21,7 +21,9 @@ export async function GET() {
     });
 
     // 1. Pipeline Financials
-    let totalPipelineValueKWD = 0;
+    let totalPipelineValueKWD = 0; // Net Pipeline Value
+    let totalGrossValueKWD = 0;
+    let totalDiscountsKWD = 0;
     let weightedRevenueKWD = 0;
     let closedWonKWD = 0;
     let inProductionKWD = 0;
@@ -34,24 +36,28 @@ export async function GET() {
     for (const deal of deals) {
       const stageConfig = PIPELINE_STAGES.find((s) => s.id === deal.stage);
       const weight = stageConfig ? stageConfig.weight : 0;
-      const val = deal.totalValueKWD || 0;
+      const netVal = deal.totalValueKWD || 0;
+      const grossVal = deal.grossValueKWD || netVal;
+      const discVal = deal.discountAmountKWD || 0;
 
       if (stageMap[deal.stage]) {
         stageMap[deal.stage].count += 1;
-        stageMap[deal.stage].value += val;
+        stageMap[deal.stage].value += netVal;
       }
 
       if (deal.stage !== 'CLOSED_LOST') {
-        totalPipelineValueKWD += val;
-        weightedRevenueKWD += val * weight;
+        totalPipelineValueKWD += netVal;
+        totalGrossValueKWD += grossVal;
+        totalDiscountsKWD += discVal;
+        weightedRevenueKWD += netVal * weight;
       }
 
       if (deal.stage === 'CLOSED_WON') {
-        closedWonKWD += val;
+        closedWonKWD += netVal;
       }
 
       if (deal.stage === 'IN_PRODUCTION') {
-        inProductionKWD += val;
+        inProductionKWD += netVal;
       }
     }
 
@@ -87,6 +93,8 @@ export async function GET() {
 
     return NextResponse.json({
       totalPipelineValueKWD,
+      totalGrossValueKWD,
+      totalDiscountsKWD,
       weightedRevenueKWD: Math.round(weightedRevenueKWD),
       closedWonKWD,
       inProductionKWD,

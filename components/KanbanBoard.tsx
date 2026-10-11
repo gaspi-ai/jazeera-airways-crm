@@ -15,9 +15,17 @@ import {
   AlertCircle,
   Clock,
   CheckCircle,
+  Search,
+  Filter,
+  Edit,
+  Trash2,
+  XCircle,
+  Percent,
+  Banknote,
 } from 'lucide-react';
 import { DealWithRelations, PIPELINE_STAGES, PipelineStage, formatKWD } from '@/lib/types';
 import { SafetyGateModal } from './SafetyGateModal';
+import { EditDealModal } from './EditDealModal';
 import { generateInsertionOrderPDF } from '@/lib/pdfGenerator';
 
 interface KanbanBoardProps {
@@ -31,6 +39,39 @@ export function KanbanBoard({ deals, onRefresh, onOpenNewDeal }: KanbanBoardProp
   const [isSafetyModalOpen, setIsSafetyModalOpen] = useState(false);
   const [updatingDealId, setUpdatingDealId] = useState<string | null>(null);
 
+  // Edit deal state
+  const [selectedDealForEdit, setSelectedDealForEdit] = useState<DealWithRelations | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+
+  // Search & Filter state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [companyTypeFilter, setCompanyTypeFilter] = useState('ALL');
+  const [safetyFilter, setSafetyFilter] = useState('ALL');
+
+  // Deletion confirm modal
+  const [dealToDelete, setDealToDelete] = useState<DealWithRelations | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Filter deals
+  const filteredDeals = deals.filter((deal) => {
+    const q = searchQuery.toLowerCase();
+    const matchesSearch =
+      !q ||
+      deal.title.toLowerCase().includes(q) ||
+      deal.dealCode.toLowerCase().includes(q) ||
+      deal.company.name.toLowerCase().includes(q);
+
+    const matchesCompany =
+      companyTypeFilter === 'ALL' || deal.company.type === companyTypeFilter;
+
+    const matchesSafety =
+      safetyFilter === 'ALL' ||
+      (safetyFilter === 'CLEARED' && deal.aviationApproval) ||
+      (safetyFilter === 'PENDING' && !deal.aviationApproval);
+
+    return matchesSearch && matchesCompany && matchesSafety;
+  });
+
   // Group deals by stage
   const dealsByStage: Record<PipelineStage, DealWithRelations[]> = PIPELINE_STAGES.reduce(
     (acc, stage) => {
@@ -40,13 +81,15 @@ export function KanbanBoard({ deals, onRefresh, onOpenNewDeal }: KanbanBoardProp
     {} as Record<PipelineStage, DealWithRelations[]>
   );
 
-  deals.forEach((deal) => {
+  filteredDeals.forEach((deal) => {
     if (dealsByStage[deal.stage as PipelineStage]) {
       dealsByStage[deal.stage as PipelineStage].push(deal);
     }
   });
 
   // Calculate live financial KPIs
+  let totalGrossKWD = 0;
+  let totalDiscountsKWD = 0;
   let totalPipelineKWD = 0;
   let weightedRevenueKWD = 0;
   let closedWonKWD = 0;
@@ -55,17 +98,21 @@ export function KanbanBoard({ deals, onRefresh, onOpenNewDeal }: KanbanBoardProp
   deals.forEach((deal) => {
     const stageConfig = PIPELINE_STAGES.find((s) => s.id === deal.stage);
     const weight = stageConfig ? stageConfig.weight : 0;
-    const val = deal.totalValueKWD || 0;
+    const netVal = deal.totalValueKWD || 0;
+    const grossVal = deal.grossValueKWD || netVal;
+    const discVal = deal.discountAmountKWD || 0;
 
     if (deal.stage !== 'CLOSED_LOST') {
-      totalPipelineKWD += val;
-      weightedRevenueKWD += val * weight;
+      totalGrossKWD += grossVal;
+      totalDiscountsKWD += discVal;
+      totalPipelineKWD += netVal;
+      weightedRevenueKWD += netVal * weight;
     }
     if (deal.stage === 'CLOSED_WON') {
-      closedWonKWD += val;
+      closedWonKWD += netVal;
     }
     if (deal.stage === 'IN_PRODUCTION') {
-      inProductionKWD += val;
+      inProductionKWD += netVal;
     }
   });
 
@@ -75,7 +122,6 @@ export function KanbanBoard({ deals, onRefresh, onOpenNewDeal }: KanbanBoardProp
 
   // Handle stage transition
   const handleStageChange = async (deal: DealWithRelations, targetStage: PipelineStage) => {
-    // Safety check: block transition to IO_SIGNED or beyond if aviation safety approval is false
     const stagesRequiringApproval: PipelineStage[] = [
       'IO_SIGNED',
       'IN_PRODUCTION',
@@ -124,6 +170,54 @@ export function KanbanBoard({ deals, onRefresh, onOpenNewDeal }: KanbanBoardProp
     }
   };
 
+  const handleCancelDeal = async (deal: DealWithRelations) => {
+    const reason = prompt(
+      `Please provide cancellation reason for "${deal.title}" (${deal.dealCode}):`,
+      'Budget reallocated / client cancelled'
+    );
+    if (reason === null) return; // user cancelled prompt
+
+    setUpdatingDealId(deal.id);
+    try {
+      const res = await fetch(`/api/deals/${deal.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stage: 'CLOSED_LOST', cancellationReason: reason }),
+      });
+      if (res.ok) {
+        onRefresh();
+      } else {
+        const data = await res.json();
+        alert(data.error || 'Failed to cancel deal');
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setUpdatingDealId(null);
+    }
+  };
+
+  const handleDeleteDeal = async () => {
+    if (!dealToDelete) return;
+    setIsDeleting(true);
+    try {
+      const res = await fetch(`/api/deals/${dealToDelete.id}`, {
+        method: 'DELETE',
+      });
+      if (res.ok) {
+        setDealToDelete(null);
+        onRefresh();
+      } else {
+        const data = await res.json();
+        alert(data.error || 'Failed to delete deal');
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const handleApproveSafetyAndAdvance = async (
     dealId: string,
     details: {
@@ -133,65 +227,58 @@ export function KanbanBoard({ deals, onRefresh, onOpenNewDeal }: KanbanBoardProp
       aviationSafetyNotes: string;
     }
   ) => {
-    setUpdatingDealId(dealId);
     try {
       const res = await fetch(`/api/deals/${dealId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          stage: 'IO_SIGNED',
           aviationApproval: true,
-          ...details,
+          flammabilityCertified: details.flammabilityCertified,
+          scannerChecked: details.scannerChecked,
+          dgcaPermitNo: details.dgcaPermitNo,
+          aviationSafetyNotes: details.aviationSafetyNotes,
+          stage: 'IO_SIGNED',
         }),
       });
 
       if (!res.ok) {
-        const err = await res.json();
-        alert(err.error || 'Error advancing deal');
+        const errorData = await res.json();
+        alert(errorData.error || 'Failed to sign off safety approval');
         return;
       }
 
+      setIsSafetyModalOpen(false);
       onRefresh();
     } catch (err) {
       console.error(err);
-    } finally {
-      setUpdatingDealId(null);
     }
   };
 
   return (
     <div className="space-y-6">
-      {/* Live Financial KPI Widget */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
-        <div className="rounded-2xl bg-gradient-to-br from-[#002B66] to-[#0B2545] text-white p-4.5 shadow-lg border border-blue-900/40 relative overflow-hidden">
-          <div className="text-[11px] font-bold uppercase tracking-wider text-sky-200">
-            Total Pipeline Value
+      {/* Financial KPIs Banner */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="rounded-2xl bg-gradient-to-br from-[#002B66] via-[#0B2545] to-[#133E87] text-white p-4.5 shadow-lg border border-sky-500/20">
+          <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-sky-200">
+            <span>Net Pipeline Revenue</span>
+            {totalDiscountsKWD > 0 && (
+              <span className="text-[10px] text-[#FFC72C] bg-white/10 px-1.5 py-0.5 rounded">
+                -{formatKWD(totalDiscountsKWD)} Disc.
+              </span>
+            )}
           </div>
-          <div className="text-2xl font-black mt-1 text-white">
+          <div className="text-2xl font-black mt-1 text-[#FFC72C] tracking-tight">
             {formatKWD(totalPipelineKWD)}
           </div>
-          <div className="text-[11px] text-sky-300 mt-1 flex items-center gap-1">
-            <span>{deals.length} Total Campaigns In Flight</span>
-          </div>
-          <div className="absolute -bottom-6 -right-6 w-20 h-20 bg-sky-400/10 rounded-full blur-xl pointer-events-none" />
-        </div>
-
-        <div className="rounded-2xl bg-gradient-to-br from-blue-700 to-[#00A3E0] text-white p-4.5 shadow-lg border border-sky-400/30 relative overflow-hidden">
-          <div className="text-[11px] font-bold uppercase tracking-wider text-sky-100 flex items-center justify-between">
-            <span>Weighted Pipeline</span>
-            <span className="rounded-full bg-white/20 px-1.5 py-0.2 text-[10px] font-mono">Forecast</span>
-          </div>
-          <div className="text-2xl font-black mt-1 text-[#FFC72C]">
-            {formatKWD(Math.round(weightedRevenueKWD))}
-          </div>
-          <div className="text-[11px] text-sky-100 mt-1">
-            Probability weighted by sales gate
+          <div className="text-[11px] text-sky-200 mt-1 flex items-center justify-between">
+            <span>Weighted: {formatKWD(Math.round(weightedRevenueKWD))}</span>
+            <span className="text-[10px] text-slate-300">Gross: {formatKWD(totalGrossKWD)}</span>
           </div>
         </div>
 
-        <div className="rounded-2xl bg-gradient-to-br from-emerald-800 to-teal-700 text-white p-4.5 shadow-lg border border-emerald-600/30">
+        <div className="rounded-2xl bg-gradient-to-br from-emerald-800 to-teal-900 text-white p-4.5 shadow-lg border border-emerald-500/30">
           <div className="text-[11px] font-bold uppercase tracking-wider text-emerald-200">
-            Closed Won Revenue
+            Closed Won (Airline Revenue)
           </div>
           <div className="text-2xl font-black mt-1 text-emerald-100">
             {formatKWD(closedWonKWD)}
@@ -226,6 +313,60 @@ export function KanbanBoard({ deals, onRefresh, onOpenNewDeal }: KanbanBoardProp
           <div className="text-[11px] text-amber-200 mt-1">
             Requires FAR/JAR-25 verification
           </div>
+        </div>
+      </div>
+
+      {/* Global Search & Filter Controls */}
+      <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="relative flex-1 w-full sm:max-w-md">
+          <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search deals by title, code (e.g. JZ-2026-001), or advertiser..."
+            className="w-full text-xs pl-9 pr-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500"
+          />
+        </div>
+
+        <div className="flex items-center gap-2.5 w-full sm:w-auto overflow-x-auto">
+          <div className="flex items-center gap-1.5 text-xs text-slate-500 font-semibold shrink-0">
+            <Filter className="h-3.5 w-3.5 text-slate-400" />
+            <span>Filter:</span>
+          </div>
+
+          <select
+            value={companyTypeFilter}
+            onChange={(e) => setCompanyTypeFilter(e.target.value)}
+            className="text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-2 text-slate-700 dark:text-slate-300 font-medium"
+          >
+            <option value="ALL">All Account Types</option>
+            <option value="DIRECT_CLIENT">Direct Clients</option>
+            <option value="AGENCY">Media Agencies</option>
+          </select>
+
+          <select
+            value={safetyFilter}
+            onChange={(e) => setSafetyFilter(e.target.value)}
+            className="text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-2 text-slate-700 dark:text-slate-300 font-medium"
+          >
+            <option value="ALL">All Safety Statuses</option>
+            <option value="CLEARED">Safety Cleared Only</option>
+            <option value="PENDING">Safety Audit Required</option>
+          </select>
+
+          {(searchQuery || companyTypeFilter !== 'ALL' || safetyFilter !== 'ALL') && (
+            <button
+              onClick={() => {
+                setSearchQuery('');
+                setCompanyTypeFilter('ALL');
+                setSafetyFilter('ALL');
+              }}
+              className="px-2.5 py-1.5 text-xs rounded-lg text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 font-semibold cursor-pointer shrink-0"
+            >
+              Reset
+            </button>
+          )}
         </div>
       </div>
 
@@ -282,6 +423,7 @@ export function KanbanBoard({ deals, onRefresh, onOpenNewDeal }: KanbanBoardProp
                   ) : (
                     stageDeals.map((deal) => {
                       const isUpdating = updatingDealId === deal.id;
+                      const hasDiscount = (deal.discountAmountKWD || 0) > 0;
 
                       return (
                         <div
@@ -297,9 +439,16 @@ export function KanbanBoard({ deals, onRefresh, onOpenNewDeal }: KanbanBoardProp
                             <span className="font-mono text-[10px] font-bold text-[#002B66] dark:text-sky-400 bg-blue-50 dark:bg-blue-950/80 px-1.5 py-0.5 rounded">
                               {deal.dealCode}
                             </span>
-                            <span className="font-black text-xs text-slate-900 dark:text-slate-100">
-                              {formatKWD(deal.totalValueKWD)}
-                            </span>
+                            <div className="text-right">
+                              <span className="font-black text-xs text-slate-900 dark:text-slate-100 block">
+                                {formatKWD(deal.totalValueKWD)}
+                              </span>
+                              {hasDiscount && (
+                                <span className="text-[9.5px] text-red-500 font-semibold block">
+                                  -{formatKWD(deal.discountAmountKWD!)} ({deal.discountValue}%)
+                                </span>
+                              )}
+                            </div>
                           </div>
 
                           {/* Title */}
@@ -315,6 +464,13 @@ export function KanbanBoard({ deals, onRefresh, onOpenNewDeal }: KanbanBoardProp
                               {deal.company.type === 'AGENCY' ? 'Agency' : 'Direct'}
                             </span>
                           </div>
+
+                          {/* Cancellation Note if LOST */}
+                          {deal.stage === 'CLOSED_LOST' && deal.cancellationReason && (
+                            <div className="mt-2 p-1.5 rounded bg-red-50 dark:bg-red-950/40 text-[10px] text-red-700 dark:text-red-300 font-medium">
+                              Reason: {deal.cancellationReason}
+                            </div>
+                          )}
 
                           {/* Inventory Asset Pills */}
                           <div className="mt-2.5 flex flex-wrap gap-1">
@@ -346,7 +502,7 @@ export function KanbanBoard({ deals, onRefresh, onOpenNewDeal }: KanbanBoardProp
                                   setSelectedDealForSafety(deal);
                                   setIsSafetyModalOpen(true);
                                 }}
-                                className="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-bold hover:underline"
+                                className="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-bold hover:underline cursor-pointer"
                               >
                                 <ShieldAlert className="h-3.5 w-3.5 animate-pulse" />
                                 Safety Audit Req.
@@ -361,16 +517,52 @@ export function KanbanBoard({ deals, onRefresh, onOpenNewDeal }: KanbanBoardProp
                             )}
                           </div>
 
-                          {/* Stage Transition Toolbar */}
-                          <div className="mt-3 pt-2 border-t border-slate-100 dark:border-slate-700/60 flex items-center justify-between gap-1.5">
-                            <button
-                              title="Download Insertion Order (IO) PDF"
-                              onClick={() => generateInsertionOrderPDF(deal)}
-                              className="p-1 rounded text-slate-500 hover:text-[#002B66] hover:bg-blue-50 dark:hover:bg-slate-700 transition-colors"
-                            >
-                              <FileText className="h-3.5 w-3.5" />
-                            </button>
+                          {/* Action Toolbar */}
+                          <div className="mt-3 pt-2 border-t border-slate-100 dark:border-slate-700/60 flex items-center justify-between gap-1">
+                            <div className="flex items-center gap-1">
+                              {/* Edit Deal Button */}
+                              <button
+                                title="Edit Deal & Pricing"
+                                onClick={() => {
+                                  setSelectedDealForEdit(deal);
+                                  setIsEditModalOpen(true);
+                                }}
+                                className="p-1 rounded text-slate-500 hover:text-[#002B66] hover:bg-sky-50 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                              >
+                                <Edit className="h-3.5 w-3.5" />
+                              </button>
 
+                              {/* PDF Button */}
+                              <button
+                                title="Download Insertion Order (IO) PDF"
+                                onClick={() => generateInsertionOrderPDF(deal)}
+                                className="p-1 rounded text-slate-500 hover:text-[#002B66] hover:bg-blue-50 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                              >
+                                <FileText className="h-3.5 w-3.5" />
+                              </button>
+
+                              {/* Cancel Deal Button */}
+                              {deal.stage !== 'CLOSED_LOST' && (
+                                <button
+                                  title="Cancel Deal"
+                                  onClick={() => handleCancelDeal(deal)}
+                                  className="p-1 rounded text-slate-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                                >
+                                  <XCircle className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+
+                              {/* Delete Deal Button */}
+                              <button
+                                title="Delete Deal"
+                                onClick={() => setDealToDelete(deal)}
+                                className="p-1 rounded text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+
+                            {/* Stage Transition Navigation */}
                             <div className="flex items-center gap-1">
                               {stageIndex > 0 && (
                                 <button
@@ -378,7 +570,7 @@ export function KanbanBoard({ deals, onRefresh, onOpenNewDeal }: KanbanBoardProp
                                   onClick={() =>
                                     handleStageChange(deal, PIPELINE_STAGES[stageIndex - 1].id)
                                   }
-                                  className="p-1 rounded text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700"
+                                  className="p-1 rounded text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer"
                                 >
                                   <ChevronLeft className="h-3.5 w-3.5" />
                                 </button>
@@ -390,7 +582,7 @@ export function KanbanBoard({ deals, onRefresh, onOpenNewDeal }: KanbanBoardProp
                                   onClick={() =>
                                     handleStageChange(deal, PIPELINE_STAGES[stageIndex + 1].id)
                                   }
-                                  className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold transition-all ${
+                                  className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold transition-all cursor-pointer ${
                                     PIPELINE_STAGES[stageIndex + 1].id === 'IO_SIGNED' &&
                                     !deal.aviationApproval
                                       ? 'bg-amber-100 text-amber-800 hover:bg-amber-200'
@@ -414,16 +606,63 @@ export function KanbanBoard({ deals, onRefresh, onOpenNewDeal }: KanbanBoardProp
         </div>
       </div>
 
-      {/* Safety Gate Modal */}
-      <SafetyGateModal
-        deal={selectedDealForSafety}
-        isOpen={isSafetyModalOpen}
-        onClose={() => {
-          setIsSafetyModalOpen(false);
-          setSelectedDealForSafety(null);
-        }}
-        onApproveAndAdvance={handleApproveSafetyAndAdvance}
-      />
+      {/* Safety Gate Sign-off Modal */}
+      {selectedDealForSafety && (
+        <SafetyGateModal
+          isOpen={isSafetyModalOpen}
+          onClose={() => setIsSafetyModalOpen(false)}
+          deal={selectedDealForSafety}
+          onApproveAndAdvance={handleApproveSafetyAndAdvance}
+        />
+      )}
+
+      {/* Edit Deal Modal */}
+      {selectedDealForEdit && (
+        <EditDealModal
+          isOpen={isEditModalOpen}
+          onClose={() => {
+            setIsEditModalOpen(false);
+            setSelectedDealForEdit(null);
+          }}
+          deal={selectedDealForEdit}
+          onDealUpdated={onRefresh}
+        />
+      )}
+
+      {/* Delete Deal Confirmation Modal */}
+      {dealToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 shadow-2xl animate-in fade-in zoom-in-95">
+            <div className="flex items-center gap-3 text-red-600 mb-3">
+              <AlertCircle className="h-6 w-6" />
+              <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
+                Confirm Deal Deletion
+              </h3>
+            </div>
+            <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+              Are you sure you want to permanently delete deal <strong>{dealToDelete.dealCode}</strong> (
+              <em>{dealToDelete.title}</em>)? This will release all booked inventory slots back into the avails engine.
+            </p>
+            <div className="mt-6 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setDealToDelete(null)}
+                className="px-4 py-2 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={handleDeleteDeal}
+                className="px-5 py-2 text-xs font-bold bg-red-600 hover:bg-red-700 text-white rounded-lg shadow-md cursor-pointer disabled:opacity-50"
+              >
+                {isDeleting ? 'Deleting...' : 'Delete Deal'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

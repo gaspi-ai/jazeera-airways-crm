@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { formatDate } from '@/lib/types';
 
 export async function GET(
   request: Request,
@@ -32,7 +33,8 @@ export async function GET(
     return NextResponse.json(deal);
   } catch (error) {
     console.error('Error fetching deal:', error);
-    return NextResponse.json({ error: 'Failed to fetch deal' }, { status: 500 });
+    const details = error instanceof Error ? error.message : String(error);
+    return NextResponse.json({ error: 'Failed to fetch deal', details }, { status: 500 });
   }
 }
 
@@ -93,8 +95,117 @@ export async function PATCH(
     if (body.dgcaPermitNo !== undefined) updateData.dgcaPermitNo = body.dgcaPermitNo;
     if (body.aviationSafetyNotes !== undefined)
       updateData.aviationSafetyNotes = body.aviationSafetyNotes;
+    if (body.cancellationReason !== undefined) updateData.cancellationReason = body.cancellationReason;
     if (body.notes !== undefined) updateData.notes = body.notes;
-    if (body.totalValueKWD !== undefined) updateData.totalValueKWD = Number(body.totalValueKWD);
+
+    // If new booking slots are provided, validate overlaps and recreate
+    let grossVal = currentDeal.grossValueKWD || currentDeal.totalValueKWD;
+
+    if (body.bookingSlots && Array.isArray(body.bookingSlots)) {
+      grossVal = 0;
+      const validatedSlots = [];
+
+      for (const slot of body.bookingSlots) {
+        const start = new Date(slot.startDate || body.targetStartDate || currentDeal.targetStartDate);
+        const end = new Date(slot.endDate || body.targetEndDate || currentDeal.targetEndDate);
+        const rate = Number(slot.agreedRateKWD) || 0;
+        grossVal += rate;
+
+        const asset = await prisma.inventoryAsset.findUnique({
+          where: { id: slot.assetId },
+        });
+
+        if (!asset) {
+          return NextResponse.json({ error: `Asset ID ${slot.assetId} not found` }, { status: 404 });
+        }
+
+        // Overlap safeguards (exclude current deal's own slots and CLOSED_LOST)
+        if (!asset.isDigitalLoop) {
+          const conflict = await prisma.bookingSlot.findFirst({
+            where: {
+              assetId: asset.id,
+              dealId: { not: id },
+              deal: {
+                stage: { not: 'CLOSED_LOST' },
+              },
+              startDate: { lte: end },
+              endDate: { gte: start },
+            },
+            include: {
+              deal: {
+                include: { company: true },
+              },
+            },
+          });
+
+          if (conflict) {
+            return NextResponse.json(
+              {
+                error: `Exclusive Booking Conflict: ${asset.name} (${asset.code}) is already booked from ${formatDate(conflict.startDate)} to ${formatDate(conflict.endDate)} for ${conflict.deal.company.name}.`,
+                code: 'ASSET_EXCLUSIVE_CONFLICT',
+              },
+              { status: 409 }
+            );
+          }
+        } else {
+          const overlappingCount = await prisma.bookingSlot.count({
+            where: {
+              assetId: asset.id,
+              dealId: { not: id },
+              deal: {
+                stage: { not: 'CLOSED_LOST' },
+              },
+              startDate: { lte: end },
+              endDate: { gte: start },
+            },
+          });
+
+          if (overlappingCount >= asset.loopMaxClients) {
+            return NextResponse.json(
+              {
+                error: `Digital Loop Capacity Full: ${asset.name} (${asset.code}) already has ${overlappingCount}/${asset.loopMaxClients} active advertisers during the chosen date range.`,
+                code: 'DIGITAL_LOOP_FULL',
+              },
+              { status: 409 }
+            );
+          }
+        }
+
+        validatedSlots.push({
+          dealId: id,
+          assetId: slot.assetId,
+          startDate: start,
+          endDate: end,
+          slotIndex: slot.slotIndex || 1,
+          agreedRateKWD: rate,
+          productionIncluded: Boolean(slot.productionIncluded),
+          notes: slot.notes || null,
+        });
+      }
+
+      // Recreate booking slots in a transaction
+      await prisma.bookingSlot.deleteMany({ where: { dealId: id } });
+      await prisma.bookingSlot.createMany({ data: validatedSlots });
+    }
+
+    // Handle Discounts
+    const discType = body.discountType !== undefined ? body.discountType : currentDeal.discountType;
+    const discVal = body.discountValue !== undefined ? Number(body.discountValue) : currentDeal.discountValue;
+
+    let discountAmountKWD = 0;
+    if (discType === 'PERCENTAGE' && discVal > 0) {
+      discountAmountKWD = Math.round(grossVal * (discVal / 100));
+    } else if (discType === 'FIXED_AMOUNT' && discVal > 0) {
+      discountAmountKWD = Math.min(grossVal, discVal);
+    }
+
+    const netValueKWD = Math.max(0, grossVal - discountAmountKWD);
+
+    updateData.grossValueKWD = grossVal;
+    updateData.discountType = discType || 'NONE';
+    updateData.discountValue = discVal;
+    updateData.discountAmountKWD = discountAmountKWD;
+    updateData.totalValueKWD = netValueKWD;
 
     const updatedDeal = await prisma.deal.update({
       where: { id },
@@ -116,7 +227,8 @@ export async function PATCH(
     return NextResponse.json(updatedDeal);
   } catch (error) {
     console.error('Error updating deal:', error);
-    return NextResponse.json({ error: 'Failed to update deal' }, { status: 500 });
+    const details = error instanceof Error ? error.message : String(error);
+    return NextResponse.json({ error: 'Failed to update deal', details }, { status: 500 });
   }
 }
 
@@ -129,9 +241,10 @@ export async function DELETE(
     await prisma.deal.delete({
       where: { id },
     });
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, message: 'Deal deleted successfully' });
   } catch (error) {
     console.error('Error deleting deal:', error);
-    return NextResponse.json({ error: 'Failed to delete deal' }, { status: 500 });
+    const details = error instanceof Error ? error.message : String(error);
+    return NextResponse.json({ error: 'Failed to delete deal', details }, { status: 500 });
   }
 }

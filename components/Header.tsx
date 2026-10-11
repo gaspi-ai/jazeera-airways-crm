@@ -13,6 +13,7 @@ import {
   ShieldCheck,
   Globe,
   Radio,
+  Settings,
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -35,6 +36,7 @@ export function Header({
     { id: 'insertion_orders', label: 'Insertion Orders (IO)', icon: FileText },
     { id: 'pop', label: 'Proof of Performance', icon: Camera },
     { id: 'companies', label: 'Advertisers & Agencies', icon: Building2 },
+    { id: 'settings', label: 'Settings & Admin', icon: Settings },
   ];
 
   return (

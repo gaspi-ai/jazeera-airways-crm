@@ -8,6 +8,7 @@ import { RateCardsTable } from '@/components/RateCardsTable';
 import { InsertionOrdersViewer } from '@/components/InsertionOrdersViewer';
 import { ProofOfPerformanceViewer } from '@/components/ProofOfPerformanceViewer';
 import { CompaniesDirectory } from '@/components/CompaniesDirectory';
+import { SettingsModule } from '@/components/SettingsModule';
 import { PitchDeckStatsDrawer } from '@/components/PitchDeckStatsDrawer';
 import { NewDealModal } from '@/components/NewDealModal';
 import { DealWithRelations, InventoryAssetWithBookings } from '@/lib/types';
@@ -49,6 +50,13 @@ export default function Home() {
   };
 
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const tab = params.get('tab');
+      if (tab) {
+        setActiveTab(tab);
+      }
+    }
     loadData();
   }, []);
 
@@ -106,6 +114,13 @@ export default function Home() {
                 companies={companies}
                 onRefresh={loadData}
                 onOpenNewDeal={() => setIsNewDealOpen(true)}
+              />
+            )}
+
+            {activeTab === 'settings' && (
+              <SettingsModule
+                assets={assets}
+                onRefreshAssets={loadData}
               />
             )}
           </>

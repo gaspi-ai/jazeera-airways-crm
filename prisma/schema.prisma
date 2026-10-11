@@ -20,6 +20,7 @@ model Company {
   contactEmail   String
   phone          String?
   billingAddress String?
+  isArchived     Boolean   @default(false)
   createdAt      DateTime  @default(now())
   contacts       Contact[]
   deals          Deal[]
@@ -70,7 +71,11 @@ model Deal {
   company                Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
   contactId              String?
   contact                Contact?             @relation(fields: [contactId], references: [id])
-  totalValueKWD          Float                @default(0)
+  grossValueKWD          Float                @default(0)
+  discountType           String?              // NONE | PERCENTAGE | FIXED_AMOUNT
+  discountValue          Float                @default(0)
+  discountAmountKWD      Float                @default(0)
+  totalValueKWD          Float                @default(0) // Net Value after discount
   stage                  String               @default("RFP_RECEIVED")
   // Stages:
   // 1: RFP_RECEIVED
@@ -89,6 +94,7 @@ model Deal {
   flammabilityCertified  Boolean              @default(false) // FAR/JAR-25 flammability compliance
   scannerChecked         Boolean              @default(false) // Barcode/scanner reflection test
   dgcaPermitNo           String?
+  cancellationReason     String?
   notes                  String?
   createdAt              DateTime             @default(now())
   updatedAt              DateTime             @updatedAt
@@ -126,3 +132,10 @@ model ProofOfPerformance {
   inspectionNotes        String?
   createdAt              DateTime       @default(now())
 }
+
+model SystemSetting {
+  key       String   @id
+  value     String   // JSON string
+  updatedAt DateTime @updatedAt
+}
+

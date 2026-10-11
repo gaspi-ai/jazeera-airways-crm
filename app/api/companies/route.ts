@@ -1,9 +1,33 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const { searchParams } = new URL(request.url);
+    const includeArchived = searchParams.get('includeArchived') === 'true';
+    const search = searchParams.get('search')?.toLowerCase();
+    const type = searchParams.get('type');
+    const industry = searchParams.get('industry');
+
+    const whereClause: any = {};
+    if (!includeArchived) {
+      whereClause.isArchived = false;
+    }
+    if (type) {
+      whereClause.type = type;
+    }
+    if (industry) {
+      whereClause.industry = industry;
+    }
+    if (search) {
+      whereClause.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { contactEmail: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
     const companies = await prisma.company.findMany({
+      where: whereClause,
       include: {
         contacts: true,
         deals: {
@@ -13,6 +37,7 @@ export async function GET() {
             title: true,
             stage: true,
             totalValueKWD: true,
+            grossValueKWD: true,
           },
         },
       },
@@ -30,7 +55,15 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { name, type = 'DIRECT_CLIENT', industry = 'OTHER', contactEmail, phone, billingAddress, contacts = [] } = body;
+    const {
+      name,
+      type = 'DIRECT_CLIENT',
+      industry = 'OTHER',
+      contactEmail,
+      phone,
+      billingAddress,
+      contacts = [],
+    } = body;
 
     if (!name || !contactEmail) {
       return NextResponse.json({ error: 'Name and Contact Email are required' }, { status: 400 });
@@ -61,6 +94,7 @@ export async function POST(request: Request) {
     return NextResponse.json(company, { status: 201 });
   } catch (error) {
     console.error('Error creating company:', error);
-    return NextResponse.json({ error: 'Failed to create company' }, { status: 500 });
+    const details = error instanceof Error ? error.message : String(error);
+    return NextResponse.json({ error: 'Failed to create company', details }, { status: 500 });
   }
 }

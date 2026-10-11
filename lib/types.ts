@@ -140,7 +140,11 @@ export interface DealWithRelations {
   title: string;
   companyId: string;
   contactId: string | null;
-  totalValueKWD: number;
+  grossValueKWD?: number;
+  discountType?: 'NONE' | 'PERCENTAGE' | 'FIXED_AMOUNT' | null;
+  discountValue?: number;
+  discountAmountKWD?: number;
+  totalValueKWD: number; // Net Payable Value
   stage: string;
   targetStartDate: Date | string | null;
   targetEndDate: Date | string | null;
@@ -149,6 +153,7 @@ export interface DealWithRelations {
   flammabilityCertified: boolean;
   scannerChecked: boolean;
   dgcaPermitNo: string | null;
+  cancellationReason?: string | null;
   notes: string | null;
   createdAt: Date | string;
   updatedAt: Date | string;
@@ -160,6 +165,7 @@ export interface DealWithRelations {
     contactEmail: string;
     phone: string | null;
     billingAddress: string | null;
+    isArchived?: boolean;
   };
   contact: {
     id: string;
@@ -228,3 +234,45 @@ export function formatDate(date: Date | string | null | undefined): string {
   const year = d.getFullYear();
   return `${day}/${month}/${year}`;
 }
+
+export interface CompanyWithRelations {
+  id: string;
+  name: string;
+  type: string;
+  industry: string;
+  contactEmail: string;
+  phone: string | null;
+  billingAddress: string | null;
+  isArchived: boolean;
+  createdAt: Date | string;
+  contacts: {
+    id: string;
+    companyId: string;
+    name: string;
+    role: string;
+    email: string;
+    phone: string | null;
+  }[];
+  deals?: {
+    id: string;
+    dealCode: string;
+    title: string;
+    stage: string;
+    totalValueKWD: number;
+    grossValueKWD?: number;
+  }[];
+}
+
+export interface SystemSettings {
+  agencyCommissionPreset: number;
+  defaultDiscountPresets: number[];
+  currency: string;
+  entityName: string;
+  department: string;
+  taxRegistration: string;
+  minProductionLeadWeeks: number;
+  flammabilityStandard: string;
+  scannerStandard: string;
+  dgcaPermitRequired: boolean;
+}
+

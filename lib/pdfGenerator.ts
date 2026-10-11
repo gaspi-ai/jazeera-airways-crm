@@ -168,30 +168,52 @@ export function generateInsertionOrderPDF(deal: DealWithRelations) {
 
   // Financial Summary Box
   const finalY = (doc as any).lastAutoTable?.finalY || yPos + 50;
+  const grossAmount = deal.grossValueKWD || deal.totalValueKWD;
+  const discountAmount = deal.discountAmountKWD || 0;
+  const hasDiscount = discountAmount > 0;
+  const boxHeight = hasDiscount ? 26 : 20;
 
   doc.setFillColor(COLOR_LIGHT[0], COLOR_LIGHT[1], COLOR_LIGHT[2]);
-  doc.rect(pageWidth - 80, finalY + 4, 66, 20, 'F');
+  doc.rect(pageWidth - 85, finalY + 4, 71, boxHeight, 'F');
   doc.setDrawColor(COLOR_SECONDARY[0], COLOR_SECONDARY[1], COLOR_SECONDARY[2]);
-  doc.rect(pageWidth - 80, finalY + 4, 66, 20, 'D');
+  doc.rect(pageWidth - 85, finalY + 4, 71, boxHeight, 'D');
 
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
+  doc.setFontSize(7.5);
   doc.setTextColor(COLOR_DARK[0], COLOR_DARK[1], COLOR_DARK[2]);
-  doc.text('Subtotal Media Fees:', pageWidth - 76, finalY + 9);
-  doc.text('Production / Installation:', pageWidth - 76, finalY + 14);
+  doc.text('Gross Rate Card Total:', pageWidth - 81, finalY + 9);
 
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8);
-  doc.text(`${deal.totalValueKWD.toLocaleString()} KWD`, pageWidth - 18, finalY + 9, { align: 'right' });
-  doc.text('INCLUDED', pageWidth - 18, finalY + 14, { align: 'right' });
+  doc.text(`${grossAmount.toLocaleString()} KWD`, pageWidth - 18, finalY + 9, { align: 'right' });
 
-  doc.setFontSize(10);
+  let curY = finalY + 14;
+  if (hasDiscount) {
+    const discLabel =
+      deal.discountType === 'PERCENTAGE'
+        ? `Discount Applied (${deal.discountValue}%):`
+        : 'Special Commercial Discount:';
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(185, 28, 28); // Red
+    doc.text(discLabel, pageWidth - 81, curY);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`-${discountAmount.toLocaleString()} KWD`, pageWidth - 18, curY, { align: 'right' });
+    curY += 5;
+  }
+
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(COLOR_DARK[0], COLOR_DARK[1], COLOR_DARK[2]);
+  doc.text('Production / Installation:', pageWidth - 81, curY);
+  doc.setFont('helvetica', 'bold');
+  doc.text('INCLUDED', pageWidth - 18, curY, { align: 'right' });
+
+  curY += 6;
+  doc.setFontSize(9.5);
   doc.setTextColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
-  doc.text('Total Net Payable:', pageWidth - 76, finalY + 20);
-  doc.text(`${deal.totalValueKWD.toLocaleString()} KWD`, pageWidth - 18, finalY + 20, { align: 'right' });
+  doc.text('Total Net Payable:', pageWidth - 81, curY);
+  doc.text(`${deal.totalValueKWD.toLocaleString()} KWD`, pageWidth - 18, curY, { align: 'right' });
 
   // Safety & Aviation Terms Block
-  let termsY = finalY + 28;
+  let termsY = finalY + (hasDiscount ? 34 : 28);
 
   doc.setFillColor(254, 249, 195); // Light Yellow box
   doc.rect(14, termsY, pageWidth - 28, 22, 'F');
