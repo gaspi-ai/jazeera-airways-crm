@@ -29,7 +29,8 @@ export async function GET() {
     return NextResponse.json(deals);
   } catch (error) {
     console.error('Error fetching deals:', error);
-    return NextResponse.json({ error: 'Failed to fetch deals' }, { status: 500 });
+    const details = error instanceof Error ? error.message : String(error);
+    return NextResponse.json({ error: 'Failed to fetch deals', details }, { status: 500 });
   }
 }
 

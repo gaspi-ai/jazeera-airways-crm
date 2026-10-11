@@ -109,6 +109,7 @@ export async function GET() {
     });
   } catch (error) {
     console.error('Error calculating stats:', error);
-    return NextResponse.json({ error: 'Failed to calculate stats' }, { status: 500 });
+    const details = error instanceof Error ? error.message : String(error);
+    return NextResponse.json({ error: 'Failed to calculate stats', details }, { status: 500 });
   }
 }

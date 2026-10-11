@@ -69,6 +69,7 @@ export async function GET() {
     return NextResponse.json(enrichedAssets);
   } catch (error) {
     console.error('Error fetching inventory:', error);
-    return NextResponse.json({ error: 'Failed to fetch inventory' }, { status: 500 });
+    const details = error instanceof Error ? error.message : String(error);
+    return NextResponse.json({ error: 'Failed to fetch inventory', details }, { status: 500 });
   }
 }
