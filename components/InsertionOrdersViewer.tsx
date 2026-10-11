@@ -36,7 +36,7 @@ export function InsertionOrdersViewer({ deals }: InsertionOrdersViewerProps) {
             <span className="bg-[#FFC72C] text-[#002B66] font-bold text-[10px] uppercase px-2 py-0.5 rounded">
               Contract & Commercial Engine
             </span>
-            <span className="text-xs text-sky-200">Legal Concessionaire: Add Effect Advertising</span>
+            <span className="text-xs text-sky-200">Jazeera Airways Commercial Media Division</span>
           </div>
           <h2 className="text-xl font-bold mt-1">Automated Insertion Orders (IO)</h2>
           <p className="text-xs text-sky-100 mt-0.5 max-w-xl">

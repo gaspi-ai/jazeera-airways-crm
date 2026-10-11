@@ -134,7 +134,7 @@ export default function Home() {
             <span>Terminal 5 & Fleet Commercial Network</span>
           </div>
           <div>
-            Operated in official partnership with <strong>Add Effect Advertising W.L.L.</strong>
+            Jazeera Airways K.S.C.P. Commercial Media & In-Flight Sales Division
           </div>
         </div>
       </footer>

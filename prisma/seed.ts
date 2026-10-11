@@ -594,7 +594,7 @@ async function main() {
       scannerChecked: true,
       dgcaPermitNo: 'DGCA-MED-2026-041',
       aviationSafetyNotes: 'All creative motion and luminance levels audited by DGCA. Non-distracting contrast certified.',
-      notes: 'Strategic high-yield partnership with Add Effect Advertising.',
+      notes: 'Strategic high-yield partnership with Jazeera Airways Commercial Media.',
       bookingSlots: {
         create: [
           {
@@ -704,7 +704,7 @@ async function main() {
       scannerChecked: true,
       dgcaPermitNo: 'DGCA-MED-2026-102',
       aviationSafetyNotes: 'FAR/JAR-25 cabin material flammability tests passed. Sky Bridge lightboxes approved by airport safety board.',
-      notes: 'IO executed by KFH CEO Office and Add Effect Advertising.',
+      notes: 'IO executed by KFH CEO Office and Jazeera Airways Commercial Media Division.',
       bookingSlots: {
         create: [
           {
@@ -915,7 +915,7 @@ async function main() {
             photoUrls: JSON.stringify([
               'https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=1200&q=80',
             ]),
-            certifiedBy: 'Laila Al-Faraj (Add Effect Brand Ops Lead)',
+            certifiedBy: 'Laila Al-Faraj (Jazeera Airways Brand Ops Lead)',
             inspectorRole: 'In-Flight Publications Inspector',
             complianceStatus: 'VERIFIED',
             inspectionNotes: 'Verified aboard flight J9 253 to Dubai and J9 111 to Riyadh. All magazine copies in pristine condition.',

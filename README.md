@@ -1,6 +1,6 @@
 # Jazeera Airways — Terminal 5 & In-Flight Media Sales CRM
 
-A production-ready local B2B Media Sales CRM & Inventory Booking System explicitly customized for **Jazeera Airways** (Terminal 5 & In-Flight media network operated in partnership with **Add Effect Advertising**).
+A production-ready local B2B Media Sales CRM & Inventory Booking System explicitly customized for **Jazeera Airways** (Terminal 5 & In-Flight media network).
 
 ![Jazeera Airways CRM](https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=1200&q=80)
 
@@ -69,5 +69,5 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ---
 
-## 📄 License & Concessionaire
-Operated exclusively for Jazeera Airways Terminal 5 and In-Flight commercial advertising in partnership with Add Effect Advertising W.L.L., Kuwait.
+## 📄 Commercial Governance
+Operated exclusively by Jazeera Airways K.S.C.P. Commercial Media & In-Flight Sales Division, Kuwait.

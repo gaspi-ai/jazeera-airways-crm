@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: 'Jazeera Airways | Terminal 5 & In-Flight Media Sales CRM',
   description:
-    'B2B Media Sales CRM & Inventory Booking System for Jazeera Airways Terminal 5 and In-Flight media network operated in partnership with Add Effect Advertising.',
+    'Dedicated B2B Media Sales CRM & Inventory Booking System for Jazeera Airways Terminal 5 and Fleet In-Flight media network.',
 };
 
 export default function RootLayout({

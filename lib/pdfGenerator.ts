@@ -39,7 +39,7 @@ export function generateInsertionOrderPDF(deal: DealWithRelations) {
 
   doc.setFontSize(8);
   doc.setTextColor(200, 225, 255);
-  doc.text('Exclusive Media Concessionaire: Add Effect Advertising', 15, 23);
+  doc.text('Commercial & In-Flight Media Division', 15, 23);
 
   // Document Title Badge on Right
   doc.setFont('helvetica', 'bold');
@@ -231,14 +231,14 @@ export function generateInsertionOrderPDF(deal: DealWithRelations) {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
   doc.setTextColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
-  doc.text('FOR JAZEERA AIRWAYS & ADD EFFECT:', 18, sigY + 6);
+  doc.text('FOR JAZEERA AIRWAYS K.S.C.P.:', 18, sigY + 6);
   doc.text('FOR CLIENT / MEDIA AGENCY ACCEPTANCE:', 112, sigY + 6);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7);
   doc.setTextColor(COLOR_DARK[0], COLOR_DARK[1], COLOR_DARK[2]);
   doc.text('Authorised Signatory: Commercial Media Director', 18, sigY + 12);
-  doc.text('Add Effect Advertising W.L.L. - Kuwait', 18, sigY + 16);
+  doc.text('Jazeera Airways Commercial Division - Kuwait', 18, sigY + 16);
   doc.text('Signature & Official Seal: ____________________', 18, sigY + 24);
 
   doc.text(`Authorized Name: ${deal.contact ? deal.contact.name : 'Authorized Signatory'}`, 112, sigY + 12);
@@ -249,7 +249,7 @@ export function generateInsertionOrderPDF(deal: DealWithRelations) {
   doc.setFontSize(6);
   doc.setTextColor(150, 160, 175);
   doc.text(
-    'Jazeera Airways K.S.C.P. | Terminal 5, Kuwait International Airport | Add Effect Advertising Concessionaire | Generated via Jazeera Media Sales CRM',
+    'Jazeera Airways K.S.C.P. | Terminal 5, Kuwait International Airport | Commercial Media Division | Generated via Jazeera Media Sales CRM',
     pageWidth / 2,
     290,
     { align: 'center' }
@@ -288,7 +288,7 @@ export function generateProofOfPerformancePDF(deal: DealWithRelations) {
 
   doc.setFontSize(8);
   doc.setTextColor(200, 225, 255);
-  doc.text('Add Effect Advertising - Quality Assurance & Aviation Compliance', 15, 23);
+  doc.text('Jazeera Airways Commercial Media - Quality Assurance & Aviation Compliance', 15, 23);
 
   // Title
   doc.setFont('helvetica', 'bold');
@@ -380,7 +380,7 @@ export function generateProofOfPerformancePDF(deal: DealWithRelations) {
   doc.setTextColor(50, 60, 75);
   const notesText =
     deal.proofOfPerformances[0]?.inspectionNotes ||
-    'Inspection verified by Add Effect Media Operations in coordination with Jazeera Airways Engineering and Kuwait DGCA. Physical media adheres to all flame retardancy and illumination parameters.';
+    'Inspection verified by Jazeera Airways Terminal 5 Operations and Engineering Directorate in coordination with Kuwait DGCA. Physical media adheres to all flame retardancy and illumination parameters.';
   doc.text(doc.splitTextToSize(notesText, pageWidth - 28), 14, finalY + 16);
 
   // Certification Seal & Signatures
@@ -392,7 +392,7 @@ export function generateProofOfPerformancePDF(deal: DealWithRelations) {
   doc.setFontSize(9);
   doc.setTextColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
   doc.text('JAZEERA AIRWAYS OPERATIONS SIGN-OFF', 18, certY + 8);
-  doc.text('ADD EFFECT MEDIA CONCESSION STAMP', 112, certY + 8);
+  doc.text('COMMERCIAL MEDIA VERIFICATION SEAL', 112, certY + 8);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
@@ -405,7 +405,7 @@ export function generateProofOfPerformancePDF(deal: DealWithRelations) {
   doc.text('Designation: Airport Media & Terminal Operations Director', 18, certY + 20);
   doc.text('Compliance: Kuwait DGCA Class 1 Concession License', 18, certY + 25);
 
-  doc.text('Add Effect Quality Assurance Lead', 112, certY + 15);
+  doc.text('Jazeera Airways Fleet Quality Assurance Lead', 112, certY + 15);
   doc.text('Status: Flight & Ground Active Broadcast Verified', 112, certY + 20);
   doc.text('Signed & Certified on: ' + new Date().toLocaleDateString('en-GB'), 112, certY + 25);
 
@@ -413,7 +413,7 @@ export function generateProofOfPerformancePDF(deal: DealWithRelations) {
   doc.setFontSize(6);
   doc.setTextColor(150, 160, 175);
   doc.text(
-    'Jazeera Airways Terminal 5 & Fleet Media Proof of Performance Record | Add Effect Advertising W.L.L.',
+    'Jazeera Airways K.S.C.P. Terminal 5 & Fleet Media Proof of Performance Record • Commercial Media Sales Directorate',
     pageWidth / 2,
     290,
     { align: 'center' }

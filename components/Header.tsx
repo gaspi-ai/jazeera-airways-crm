@@ -57,7 +57,7 @@ export function Header({
               </span>
             </div>
             <p className="text-[10px] text-sky-200">
-              Operated exclusively in partnership with <strong>Add Effect Advertising</strong>
+              Commercial & In-Flight Media Sales Network • Kuwait International Airport
             </p>
           </div>
         </div>

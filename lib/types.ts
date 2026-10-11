@@ -57,7 +57,7 @@ export const PIPELINE_STAGES: StageConfig[] = [
     weight: 0.85,
     color: '#059669',
     badgeBg: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-300',
-    description: 'Official Insertion Order legally executed with Add Effect',
+    description: 'Official Insertion Order legally executed with Jazeera Airways',
   },
   {
     id: 'IN_PRODUCTION',

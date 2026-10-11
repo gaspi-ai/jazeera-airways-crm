@@ -106,7 +106,7 @@ export function ProofOfPerformanceViewer({ deals, onRefresh }: ProofOfPerformanc
           </div>
           <h2 className="text-xl font-bold mt-1">Proof of Performance (PoP) & Flight Audit</h2>
           <p className="text-xs text-teal-100 mt-0.5 max-w-xl">
-            Real-time installation certifications and flight inspections signed off by Jazeera Terminal 5 Operations and Add Effect Media Quality teams.
+            Real-time installation certifications and flight inspections signed off by Jazeera Airways Terminal 5 Operations and Fleet Quality Assurance teams.
           </p>
         </div>
 
