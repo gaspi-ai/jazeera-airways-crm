@@ -1,0 +1,126 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Company {
+  id             String    @id @default(cuid())
+  name           String
+  type           String    // AGENCY | DIRECT_CLIENT
+  industry       String    // FINTECH_BANKING, TELCO, RETAIL, TOURISM, FMCG, OTHER
+  contactEmail   String
+  phone          String?
+  billingAddress String?
+  createdAt      DateTime  @default(now())
+  contacts       Contact[]
+  deals          Deal[]
+}
+
+model Contact {
+  id        String   @id @default(cuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name      String
+  role      String   // Media Planner, Account Director, Brand Manager, etc.
+  email     String
+  phone     String?
+  createdAt DateTime @default(now())
+  deals     Deal[]
+}
+
+model InventoryAsset {
+  id                   String               @id @default(cuid())
+  code                 String               @unique // T5-MS-01, T5-CHK-01, T5-TR-01, AC-BIN-01, AC-SEAT-01, BL00030, DB00005, etc.
+  name                 String
+  environment          String               // T5_GROUND | INFLIGHT | DIGITAL_PRINT
+  category             String               // DIGITAL_SCREEN | LIGHTBOX | WRAP | SEATBACK | OVERHEAD_BIN | MAGAZINE | BOARDING_PASS | E_TICKET | TROLLEY
+  locationDesc         String               // e.g. "Behind Check-in Counters", "T5 Duty Free", "Arrivals Carousel", "Parking Roof Top", "A320 Cabin"
+  dimensions           String               // e.g. "19m x 2.5m (47.5 sqm)", "14m x 4m (56 sqm)", "75 inch LCD"
+  totalUnits           Int                  // e.g. 43 check-in wraps, 550 trolleys, 24 fleet aircraft, 4 carousel lightboxes
+  isDigitalLoop        Boolean              @default(false)
+  loopMaxClients       Int                  @default(6) // Default 6 for T5 digital screens; spot duration: 10 seconds
+  baseRate1M           Float?               // in KWD
+  baseRate3M           Float?               // in KWD
+  baseRate6M           Float?               // in KWD
+  baseRate12M          Float?               // in KWD
+  productionLeadWeeks  Int                  @default(4)
+  status               String               @default("AVAILABLE") // AVAILABLE | OPTIONED | SOLD_OUT | MAINTENANCE
+  technicalSpecs       String?
+  safetyComplianceReq  String?              // Adhesive flammability FAR/JAR-25 verification, sticker scanner compatibility
+  imageUrl             String?
+  createdAt            DateTime             @default(now())
+  bookingSlots         BookingSlot[]
+  proofOfPerformances  ProofOfPerformance[]
+}
+
+model Deal {
+  id                     String               @id @default(cuid())
+  dealCode               String               @unique
+  title                  String
+  companyId              String
+  company                Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  contactId              String?
+  contact                Contact?             @relation(fields: [contactId], references: [id])
+  totalValueKWD          Float                @default(0)
+  stage                  String               @default("RFP_RECEIVED")
+  // Stages:
+  // 1: RFP_RECEIVED
+  // 2: CONCEPT_PITCH
+  // 3: MEDIA_PLAN_SENT
+  // 4: AVIATION_SAFETY_APPROVAL
+  // 5: IO_SIGNED
+  // 6: IN_PRODUCTION
+  // 7: INSTALLED_POP_DELIVERED
+  // 8: CLOSED_WON
+  // 9: CLOSED_LOST
+  targetStartDate        DateTime?
+  targetEndDate          DateTime?
+  aviationApproval       Boolean              @default(false)
+  aviationSafetyNotes    String?
+  flammabilityCertified  Boolean              @default(false) // FAR/JAR-25 flammability compliance
+  scannerChecked         Boolean              @default(false) // Barcode/scanner reflection test
+  dgcaPermitNo           String?
+  notes                  String?
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @updatedAt
+  bookingSlots           BookingSlot[]
+  proofOfPerformances    ProofOfPerformance[]
+}
+
+model BookingSlot {
+  id                 String         @id @default(cuid())
+  dealId             String
+  deal               Deal           @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  assetId            String
+  asset              InventoryAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  startDate          DateTime
+  endDate            DateTime
+  slotIndex          Int            @default(1) // 1 to 6 for digital screen loops; 1 for exclusive static
+  agreedRateKWD      Float
+  productionIncluded Boolean        @default(false)
+  notes              String?
+  createdAt          DateTime       @default(now())
+}
+
+model ProofOfPerformance {
+  id                     String         @id @default(cuid())
+  dealId                 String
+  deal                   Deal           @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  assetId                String
+  asset                  InventoryAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  flightNumberOrLocation String
+  timestamp              DateTime       @default(now())
+  photoUrls              String         // JSON string or comma-separated URLs
+  certifiedBy            String
+  inspectorRole          String?
+  complianceStatus       String         @default("VERIFIED") // VERIFIED | PENDING_INSPECTION | REJECTED
+  inspectionNotes        String?
+  createdAt              DateTime       @default(now())
+}
