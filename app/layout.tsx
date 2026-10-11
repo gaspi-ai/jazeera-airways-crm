@@ -5,7 +5,7 @@ import './globals.css';
 const geistSans = Geist({
   subsets: ['latin'],
   display: 'swap',
-  preload: true,
+  preload: false,
   fallback: ['system-ui', 'sans-serif'],
 });
 

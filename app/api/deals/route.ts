@@ -108,14 +108,24 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: `Asset ID ${slot.assetId} not found` }, { status: 404 });
       }
 
-      // 2. Booking overlap safeguards (exclude CLOSED_LOST deals)
+      // 2. Booking overlap safeguards:
+      // Hard lock applies to confirmed booked stages (IO signed, in production, running, or closed won).
+      // Pipeline inquiries/pitches do not block each other.
+      const CONFIRMED_BOOKED_STAGES = [
+        'IO_SIGNED',
+        'IN_PRODUCTION',
+        'INSTALLED_POP_DELIVERED',
+        'LIVE_RUNNING',
+        'CLOSED_WON',
+      ];
+
       if (!asset.isDigitalLoop) {
         // Static Asset Exclusive Booking Check
         const conflict = await prisma.bookingSlot.findFirst({
           where: {
             assetId: asset.id,
             deal: {
-              stage: { not: 'CLOSED_LOST' },
+              stage: { in: CONFIRMED_BOOKED_STAGES },
             },
             startDate: { lte: end },
             endDate: { gte: start },
@@ -130,7 +140,7 @@ export async function POST(request: Request) {
         if (conflict) {
           return NextResponse.json(
             {
-              error: `Exclusive Booking Conflict: ${asset.name} (${asset.code}) is already booked from ${formatDate(conflict.startDate)} to ${formatDate(conflict.endDate)} for ${conflict.deal.company.name}.`,
+              error: `Exclusive Booking Conflict: ${asset.name} (${asset.code}) has a confirmed booking from ${formatDate(conflict.startDate)} to ${formatDate(conflict.endDate)} for ${conflict.deal.company.name}. Please select alternative dates or an available placement.`,
               code: 'ASSET_EXCLUSIVE_CONFLICT',
             },
             { status: 409 }
@@ -142,7 +152,7 @@ export async function POST(request: Request) {
           where: {
             assetId: asset.id,
             deal: {
-              stage: { not: 'CLOSED_LOST' },
+              stage: { in: CONFIRMED_BOOKED_STAGES },
             },
             startDate: { lte: end },
             endDate: { gte: start },
@@ -152,7 +162,7 @@ export async function POST(request: Request) {
         if (overlappingCount >= asset.loopMaxClients) {
           return NextResponse.json(
             {
-              error: `Digital Loop Capacity Full: ${asset.name} (${asset.code}) already has ${overlappingCount}/${asset.loopMaxClients} active advertisers during the chosen date range.`,
+              error: `Digital Loop Capacity Full: ${asset.name} (${asset.code}) already has ${overlappingCount}/${asset.loopMaxClients} confirmed advertisers during the chosen date range.`,
               code: 'DIGITAL_LOOP_FULL',
             },
             { status: 409 }

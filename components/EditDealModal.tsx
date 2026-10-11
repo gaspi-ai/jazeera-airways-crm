@@ -135,17 +135,59 @@ export function EditDealModal({ deal, isOpen, onClose, onDealUpdated }: EditDeal
 
   const currentCompany = companies.find((c) => c.id === selectedCompanyId) || deal.company;
 
+  const checkAssetAvailability = (assetId: string, slotStartDate?: string, slotEndDate?: string) => {
+    const asset = assets.find((a) => a.id === assetId);
+    if (!asset) return { available: true };
+    const start = new Date(slotStartDate || targetStartDate || '2026-10-01');
+    const end = new Date(slotEndDate || targetEndDate || '2026-10-31');
+    const confirmedStages = [
+      'IO_SIGNED',
+      'IN_PRODUCTION',
+      'INSTALLED_POP_DELIVERED',
+      'LIVE_RUNNING',
+      'CLOSED_WON',
+    ];
+
+    const overlappingSlots = (asset.bookingSlots || []).filter((s: any) => {
+      if (s.dealId === deal.id) return false;
+      if (!s.deal || !confirmedStages.includes(s.deal.stage)) return false;
+      const sStart = new Date(s.startDate);
+      const sEnd = new Date(s.endDate);
+      return sStart <= end && sEnd >= start;
+    });
+
+    if (asset.isDigitalLoop) {
+      const isAvailable = overlappingSlots.length < (asset.loopMaxClients || 6);
+      return {
+        available: isAvailable,
+        occupiedCount: overlappingSlots.length,
+        maxClients: asset.loopMaxClients || 6,
+        message: !isAvailable ? `Digital loop full (${overlappingSlots.length}/${asset.loopMaxClients || 6} advertisers)` : undefined,
+      };
+    }
+
+    const isAvailable = overlappingSlots.length === 0;
+    const firstConflict = overlappingSlots[0];
+    return {
+      available: isAvailable,
+      conflictCompany: firstConflict?.deal?.company?.name,
+      message: !isAvailable
+        ? `Confirmed booked by ${firstConflict?.deal?.company?.name || 'another advertiser'}`
+        : undefined,
+    };
+  };
+
   const handleAddSlot = () => {
     if (assets.length === 0) return;
-    const defaultAsset = assets[0];
+    const availableAsset = assets.find((a) => checkAssetAvailability(a.id).available) || assets[0];
     setBookingItems([
       ...bookingItems,
       {
-        assetId: defaultAsset.id,
-        startDate: targetStartDate || '2026-06-01',
-        endDate: targetEndDate || '2026-08-31',
+        assetId: availableAsset.id,
+        startDate: targetStartDate || '2026-10-01',
+        endDate: targetEndDate || '2026-10-31',
         slotIndex: 1,
-        rateKWD: defaultAsset.baseRate1M || 5000,
+        rateKWD: availableAsset.baseRate1M || 5000,
         productionIncluded: false,
       },
     ]);
@@ -170,6 +212,20 @@ export function EditDealModal({ deal, isOpen, onClose, onDealUpdated }: EditDeal
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Check for hard conflicts if deal is confirmed or being updated
+    const conflictingSlot = bookingItems.find(
+      (slot) => !checkAssetAvailability(slot.assetId, slot.startDate, slot.endDate).available
+    );
+    if (conflictingSlot && ['IO_SIGNED', 'IN_PRODUCTION', 'LIVE_RUNNING', 'CLOSED_WON'].includes(stage)) {
+      const conflictingAsset = assets.find((a) => a.id === conflictingSlot.assetId);
+      const status = checkAssetAvailability(conflictingSlot.assetId, conflictingSlot.startDate, conflictingSlot.endDate);
+      setErrorMsg(
+        `Exclusive Booking Conflict: ${conflictingAsset?.name || 'Asset'} has a confirmed booking (${status.message || 'Booked'}). Cannot advance to signed/active stage on conflicting dates.`
+      );
+      return;
+    }
+
     setLoading(true);
     setErrorMsg('');
     setSuccessMsg('');
@@ -209,7 +265,9 @@ export function EditDealModal({ deal, isOpen, onClose, onDealUpdated }: EditDeal
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to update deal');
+        setErrorMsg(data.error || 'Failed to update deal. Please verify inventory availability.');
+        setLoading(false);
+        return;
       }
 
       setSuccessMsg('Deal updated successfully!');
@@ -414,11 +472,14 @@ export function EditDealModal({ deal, isOpen, onClose, onDealUpdated }: EditDeal
                       onChange={(e) => handleUpdateSlot(idx, 'assetId', e.target.value)}
                       className="text-xs rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 p-2 text-slate-900 dark:text-slate-100 font-medium"
                     >
-                      {assets.map((a) => (
-                        <option key={a.id} value={a.id}>
-                          {a.code} - {a.name}
-                        </option>
-                      ))}
+                      {assets.map((a) => {
+                        const avail = checkAssetAvailability(a.id, item.startDate, item.endDate);
+                        return (
+                          <option key={a.id} value={a.id}>
+                            [{a.code}] {a.name} ({avail.available ? '✓ Available' : '⚠️ Booked'})
+                          </option>
+                        );
+                      })}
                     </select>
 
                     <div className="flex items-center gap-2">
@@ -459,6 +520,15 @@ export function EditDealModal({ deal, isOpen, onClose, onDealUpdated }: EditDeal
                       </button>
                     </div>
                   </div>
+
+                  {!checkAssetAvailability(item.assetId, item.startDate, item.endDate).available && (
+                    <div className="w-full mt-2 p-2 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 text-[11px] text-amber-800 dark:text-amber-200 flex items-center gap-1.5">
+                      <AlertTriangle className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+                      <span>
+                        ⚠️ {checkAssetAvailability(item.assetId, item.startDate, item.endDate).message} for dates {item.startDate} to {item.endDate}.
+                      </span>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

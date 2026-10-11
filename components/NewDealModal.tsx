@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X, Plus, Trash2, ShieldAlert, Sparkles, Building2, Calendar, Banknote } from 'lucide-react';
+import { X, Plus, Trash2, ShieldAlert, Sparkles, Building2, Calendar, Banknote, AlertTriangle } from 'lucide-react';
 import { InventoryAssetWithBookings } from '@/lib/types';
 
 interface NewDealModalProps {
@@ -17,8 +17,8 @@ export function NewDealModal({ isOpen, onClose, onDealCreated }: NewDealModalPro
   const [selectedContactId, setSelectedContactId] = useState('');
   const [assets, setAssets] = useState<InventoryAssetWithBookings[]>([]);
 
-  const [targetStartDate, setTargetStartDate] = useState('2026-06-01');
-  const [targetEndDate, setTargetEndDate] = useState('2026-08-31');
+  const [targetStartDate, setTargetStartDate] = useState('2026-10-01');
+  const [targetEndDate, setTargetEndDate] = useState('2026-10-31');
   const [aviationApproval, setAviationApproval] = useState(false);
   const [flammabilityCertified, setFlammabilityCertified] = useState(false);
   const [scannerChecked, setScannerChecked] = useState(false);
@@ -46,6 +46,47 @@ export function NewDealModal({ isOpen, onClose, onDealCreated }: NewDealModalPro
       fetchAssets();
     }
   }, [isOpen]);
+
+  const checkAssetAvailability = (assetId: string) => {
+    const asset = assets.find((a) => a.id === assetId);
+    if (!asset) return { available: true };
+    const start = new Date(targetStartDate);
+    const end = new Date(targetEndDate);
+    const confirmedStages = [
+      'IO_SIGNED',
+      'IN_PRODUCTION',
+      'INSTALLED_POP_DELIVERED',
+      'LIVE_RUNNING',
+      'CLOSED_WON',
+    ];
+
+    const overlappingSlots = (asset.bookingSlots || []).filter((s: any) => {
+      if (!s.deal || !confirmedStages.includes(s.deal.stage)) return false;
+      const sStart = new Date(s.startDate);
+      const sEnd = new Date(s.endDate);
+      return sStart <= end && sEnd >= start;
+    });
+
+    if (asset.isDigitalLoop) {
+      const isAvailable = overlappingSlots.length < (asset.loopMaxClients || 6);
+      return {
+        available: isAvailable,
+        occupiedCount: overlappingSlots.length,
+        maxClients: asset.loopMaxClients || 6,
+        message: !isAvailable ? `Digital loop full (${overlappingSlots.length}/${asset.loopMaxClients || 6} advertisers)` : undefined,
+      };
+    }
+
+    const isAvailable = overlappingSlots.length === 0;
+    const firstConflict = overlappingSlots[0];
+    return {
+      available: isAvailable,
+      conflictCompany: firstConflict?.deal?.company?.name,
+      message: !isAvailable
+        ? `Confirmed booked by ${firstConflict?.deal?.company?.name || 'another advertiser'}`
+        : undefined,
+    };
+  };
 
   const fetchCompanies = async () => {
     try {
@@ -85,12 +126,13 @@ export function NewDealModal({ isOpen, onClose, onDealCreated }: NewDealModalPro
 
   const addBookingItem = () => {
     if (assets.length === 0) return;
-    const firstAsset = assets[0];
-    const initialRate = firstAsset.baseRate1M || 5000;
+    // Prefer the first available asset for selected campaign dates
+    const availableAsset = assets.find((a) => checkAssetAvailability(a.id).available) || assets[0];
+    const initialRate = availableAsset.baseRate1M || 5000;
     setBookingItems([
       ...bookingItems,
       {
-        assetId: firstAsset.id,
+        assetId: availableAsset.id,
         durationMonths: 1,
         slotIndex: 1,
         rateKWD: initialRate,
@@ -143,6 +185,17 @@ export function NewDealModal({ isOpen, onClose, onDealCreated }: NewDealModalPro
       return;
     }
 
+    // Check for any hard booking conflicts on selected placements
+    const conflictingItem = bookingItems.find((item) => !checkAssetAvailability(item.assetId).available);
+    if (conflictingItem) {
+      const conflictingAsset = assets.find((a) => a.id === conflictingItem.assetId);
+      const status = checkAssetAvailability(conflictingItem.assetId);
+      setErrorMsg(
+        `Exclusive Booking Conflict: ${conflictingAsset?.name || 'Selected asset'} (${conflictingAsset?.code || ''}) has a confirmed booking during ${targetStartDate} to ${targetEndDate} (${status.message || 'Booked'}). Please pick an available placement or adjust campaign dates.`
+      );
+      return;
+    }
+
     setLoading(true);
     setErrorMsg('');
 
@@ -178,13 +231,15 @@ export function NewDealModal({ isOpen, onClose, onDealCreated }: NewDealModalPro
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || 'Failed to create deal');
+        setErrorMsg(data.error || 'Failed to create deal. Please verify dates and inventory availability.');
+        setLoading(false);
+        return;
       }
 
       onDealCreated();
       onClose();
     } catch (err: any) {
-      setErrorMsg(err.message || 'Something went wrong');
+      setErrorMsg(err.message || 'Something went wrong while creating deal');
     } finally {
       setLoading(false);
     }
@@ -349,11 +404,14 @@ export function NewDealModal({ isOpen, onClose, onDealCreated }: NewDealModalPro
                             onChange={(e) => updateBookingItem(idx, 'assetId', e.target.value)}
                             className="w-full text-xs rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 p-2 font-medium"
                           >
-                            {assets.map((a) => (
-                              <option key={a.id} value={a.id}>
-                                [{a.code}] {a.name} ({a.environment.replace('_', ' ')})
-                              </option>
-                            ))}
+                            {assets.map((a) => {
+                              const avail = checkAssetAvailability(a.id);
+                              return (
+                                <option key={a.id} value={a.id}>
+                                  [{a.code}] {a.name} ({avail.available ? '✓ Available' : '⚠️ Booked'})
+                                </option>
+                              );
+                            })}
                           </select>
                         </div>
 
@@ -385,6 +443,16 @@ export function NewDealModal({ isOpen, onClose, onDealCreated }: NewDealModalPro
                           />
                         </div>
                       </div>
+
+                      {/* Conflict Alert Banner if Item is Booked */}
+                      {!checkAssetAvailability(item.assetId).available && (
+                        <div className="flex items-center gap-2 p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 text-[11px] text-amber-800 dark:text-amber-200">
+                          <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+                          <span>
+                            ⚠️ {checkAssetAvailability(item.assetId).message} during campaign window ({targetStartDate} to {targetEndDate}). Please switch placement or choose alternative dates.
+                          </span>
+                        </div>
+                      )}
 
                       <div className="flex items-center justify-between pt-2 border-t border-slate-200 dark:border-slate-700 text-xs">
                         <div className="flex items-center gap-4">

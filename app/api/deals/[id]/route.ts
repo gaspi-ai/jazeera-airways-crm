@@ -119,14 +119,23 @@ export async function PATCH(
           return NextResponse.json({ error: `Asset ID ${slot.assetId} not found` }, { status: 404 });
         }
 
-        // Overlap safeguards (exclude current deal's own slots and CLOSED_LOST)
+        // Overlap safeguards:
+        // Hard lock applies to confirmed booked stages (excluding this deal's own slots)
+        const CONFIRMED_BOOKED_STAGES = [
+          'IO_SIGNED',
+          'IN_PRODUCTION',
+          'INSTALLED_POP_DELIVERED',
+          'LIVE_RUNNING',
+          'CLOSED_WON',
+        ];
+
         if (!asset.isDigitalLoop) {
           const conflict = await prisma.bookingSlot.findFirst({
             where: {
               assetId: asset.id,
               dealId: { not: id },
               deal: {
-                stage: { not: 'CLOSED_LOST' },
+                stage: { in: CONFIRMED_BOOKED_STAGES },
               },
               startDate: { lte: end },
               endDate: { gte: start },
@@ -141,7 +150,7 @@ export async function PATCH(
           if (conflict) {
             return NextResponse.json(
               {
-                error: `Exclusive Booking Conflict: ${asset.name} (${asset.code}) is already booked from ${formatDate(conflict.startDate)} to ${formatDate(conflict.endDate)} for ${conflict.deal.company.name}.`,
+                error: `Exclusive Booking Conflict: ${asset.name} (${asset.code}) has a confirmed booking from ${formatDate(conflict.startDate)} to ${formatDate(conflict.endDate)} for ${conflict.deal.company.name}. Please select alternative dates or an available placement.`,
                 code: 'ASSET_EXCLUSIVE_CONFLICT',
               },
               { status: 409 }
@@ -153,7 +162,7 @@ export async function PATCH(
               assetId: asset.id,
               dealId: { not: id },
               deal: {
-                stage: { not: 'CLOSED_LOST' },
+                stage: { in: CONFIRMED_BOOKED_STAGES },
               },
               startDate: { lte: end },
               endDate: { gte: start },
@@ -163,7 +172,7 @@ export async function PATCH(
           if (overlappingCount >= asset.loopMaxClients) {
             return NextResponse.json(
               {
-                error: `Digital Loop Capacity Full: ${asset.name} (${asset.code}) already has ${overlappingCount}/${asset.loopMaxClients} active advertisers during the chosen date range.`,
+                error: `Digital Loop Capacity Full: ${asset.name} (${asset.code}) already has ${overlappingCount}/${asset.loopMaxClients} confirmed advertisers during the chosen date range.`,
                 code: 'DIGITAL_LOOP_FULL',
               },
               { status: 409 }
