@@ -13,7 +13,6 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { DealWithRelations, formatKWD, formatDate } from '@/lib/types';
-import { generateInsertionOrderPDF } from '@/lib/pdfGenerator';
 
 interface InsertionOrdersViewerProps {
   deals: DealWithRelations[];
@@ -21,6 +20,19 @@ interface InsertionOrdersViewerProps {
 
 export function InsertionOrdersViewer({ deals }: InsertionOrdersViewerProps) {
   const [selectedDealForPreview, setSelectedDealForPreview] = useState<DealWithRelations | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+
+  const handleDownloadPDF = async (deal: DealWithRelations) => {
+    try {
+      setDownloadingId(deal.id);
+      const { generateInsertionOrderPDF } = await import('@/lib/pdfGenerator');
+      generateInsertionOrderPDF(deal);
+    } catch (err) {
+      console.error('Failed to generate PDF:', err);
+    } finally {
+      setDownloadingId(null);
+    }
+  };
 
   // Filter deals that are at least at MEDIA_PLAN_SENT, IO_SIGNED, IN_PRODUCTION, or WON
   const ioEligibleDeals = deals.filter(
@@ -135,11 +147,12 @@ export function InsertionOrdersViewer({ deals }: InsertionOrdersViewerProps) {
                           Preview
                         </button>
                         <button
-                          onClick={() => generateInsertionOrderPDF(deal)}
-                          className="px-3 py-1.5 rounded-lg bg-[#002B66] hover:bg-blue-900 text-white font-bold transition-all flex items-center gap-1.5 text-xs shadow-sm"
+                          onClick={() => handleDownloadPDF(deal)}
+                          disabled={downloadingId === deal.id}
+                          className="px-3 py-1.5 rounded-lg bg-[#002B66] hover:bg-blue-900 text-white font-bold transition-all flex items-center gap-1.5 text-xs shadow-sm disabled:opacity-50"
                         >
                           <Download className="h-3.5 w-3.5" />
-                          Download PDF
+                          {downloadingId === deal.id ? 'Generating...' : 'Download PDF'}
                         </button>
                       </div>
                     </td>
@@ -269,11 +282,12 @@ export function InsertionOrdersViewer({ deals }: InsertionOrdersViewerProps) {
                   Close
                 </button>
                 <button
-                  onClick={() => generateInsertionOrderPDF(selectedDealForPreview)}
-                  className="px-4 py-2 text-xs font-bold bg-[#002B66] text-white hover:bg-blue-900 rounded-lg flex items-center gap-1.5 shadow-sm"
+                  onClick={() => handleDownloadPDF(selectedDealForPreview)}
+                  disabled={downloadingId === selectedDealForPreview.id}
+                  className="px-4 py-2 text-xs font-bold bg-[#002B66] text-white hover:bg-blue-900 rounded-lg flex items-center gap-1.5 shadow-sm disabled:opacity-50"
                 >
                   <Download className="h-3.5 w-3.5" />
-                  Download Official PDF
+                  {downloadingId === selectedDealForPreview.id ? 'Generating PDF...' : 'Download Official PDF'}
                 </button>
               </div>
             </div>

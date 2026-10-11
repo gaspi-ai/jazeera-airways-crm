@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import useSWR from 'swr';
 import {
   X,
   Plus,
@@ -17,6 +18,8 @@ import {
 } from 'lucide-react';
 import { DealWithRelations, InventoryAssetWithBookings, PIPELINE_STAGES, formatKWD } from '@/lib/types';
 
+const editModalFetcher = (url: string) => fetch(url).then((res) => res.json());
+
 interface EditDealModalProps {
   deal: DealWithRelations | null;
   isOpen: boolean;
@@ -29,8 +32,16 @@ export function EditDealModal({ deal, isOpen, onClose, onDealUpdated }: EditDeal
   const [stage, setStage] = useState('RFP_RECEIVED');
   const [selectedCompanyId, setSelectedCompanyId] = useState('');
   const [selectedContactId, setSelectedContactId] = useState('');
-  const [companies, setCompanies] = useState<any[]>([]);
-  const [assets, setAssets] = useState<InventoryAssetWithBookings[]>([]);
+
+  const { data: companies = [] } = useSWR<any[]>(isOpen ? '/api/companies' : null, editModalFetcher, {
+    dedupingInterval: 30000,
+    revalidateOnFocus: false,
+  });
+
+  const { data: assets = [] } = useSWR<InventoryAssetWithBookings[]>(isOpen ? '/api/inventory' : null, editModalFetcher, {
+    dedupingInterval: 30000,
+    revalidateOnFocus: false,
+  });
 
   const [targetStartDate, setTargetStartDate] = useState('');
   const [targetEndDate, setTargetEndDate] = useState('');
@@ -96,30 +107,8 @@ export function EditDealModal({ deal, isOpen, onClose, onDealUpdated }: EditDeal
 
       setErrorMsg('');
       setSuccessMsg('');
-      fetchCompanies();
-      fetchAssets();
     }
   }, [isOpen, deal]);
-
-  const fetchCompanies = async () => {
-    try {
-      const res = await fetch('/api/companies');
-      const data = await res.json();
-      setCompanies(Array.isArray(data) ? data : []);
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const fetchAssets = async () => {
-    try {
-      const res = await fetch('/api/inventory');
-      const data = await res.json();
-      setAssets(Array.isArray(data) ? data : []);
-    } catch (err) {
-      console.error(err);
-    }
-  };
 
   if (!isOpen || !deal) return null;
 

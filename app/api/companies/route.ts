@@ -26,10 +26,32 @@ export async function GET(request: Request) {
       ];
     }
 
+    const limit = Math.min(Number(searchParams.get('limit')) || 100, 200);
+    const skip = Number(searchParams.get('skip')) || 0;
+
     const companies = await prisma.company.findMany({
       where: whereClause,
-      include: {
-        contacts: true,
+      take: limit,
+      skip: skip,
+      select: {
+        id: true,
+        name: true,
+        type: true,
+        industry: true,
+        contactEmail: true,
+        phone: true,
+        billingAddress: true,
+        isArchived: true,
+        createdAt: true,
+        contacts: {
+          select: {
+            id: true,
+            name: true,
+            role: true,
+            email: true,
+            phone: true,
+          },
+        },
         deals: {
           select: {
             id: true,
@@ -44,7 +66,11 @@ export async function GET(request: Request) {
       orderBy: { name: 'asc' },
     });
 
-    return NextResponse.json(companies);
+    return NextResponse.json(companies, {
+      headers: {
+        'Cache-Control': 'private, max-age=10, stale-while-revalidate=60',
+      },
+    });
   } catch (error) {
     console.error('Error fetching companies:', error);
     const details = error instanceof Error ? error.message : String(error);

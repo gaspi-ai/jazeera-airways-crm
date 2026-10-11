@@ -14,7 +14,6 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { DealWithRelations, formatDate } from '@/lib/types';
-import { generateProofOfPerformancePDF } from '@/lib/pdfGenerator';
 
 interface ProofOfPerformanceViewerProps {
   deals: DealWithRelations[];
@@ -31,6 +30,19 @@ export function ProofOfPerformanceViewer({ deals, onRefresh }: ProofOfPerformanc
   const [photoUrl, setPhotoUrl] = useState('https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=1200&q=80');
   const [notes, setNotes] = useState('Installed and audited. Full color saturation and illumination verified.');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [generatingPdfId, setGeneratingPdfId] = useState<string | null>(null);
+
+  const handleDownloadProofPDF = async (deal: DealWithRelations, popId: string) => {
+    try {
+      setGeneratingPdfId(popId);
+      const { generateProofOfPerformancePDF } = await import('@/lib/pdfGenerator');
+      generateProofOfPerformancePDF(deal);
+    } catch (err) {
+      console.error('Failed to generate PoP PDF:', err);
+    } finally {
+      setGeneratingPdfId(null);
+    }
+  };
 
   // Collect all PoP records across deals
   const allPops = deals.flatMap((deal) =>
@@ -141,6 +153,8 @@ export function ProofOfPerformanceViewer({ deals, onRefresh }: ProofOfPerformanc
                     <img
                       src={parsedPhotos[0]}
                       alt={pop.flightNumberOrLocation}
+                      loading="lazy"
+                      decoding="async"
                       className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                     />
                   ) : (
@@ -204,11 +218,12 @@ export function ProofOfPerformanceViewer({ deals, onRefresh }: ProofOfPerformanc
               {/* Bottom Action */}
               <div className="p-4 pt-0">
                 <button
-                  onClick={() => generateProofOfPerformancePDF(pop.deal)}
-                  className="w-full flex items-center justify-center gap-1.5 rounded-xl bg-slate-100 hover:bg-[#002B66] hover:text-white dark:bg-slate-800 dark:hover:bg-blue-900 text-slate-800 dark:text-slate-200 py-2 text-xs font-bold transition-all shadow-sm"
+                  onClick={() => handleDownloadProofPDF(pop.deal, pop.id)}
+                  disabled={generatingPdfId === pop.id}
+                  className="w-full flex items-center justify-center gap-1.5 rounded-xl bg-slate-100 hover:bg-[#002B66] hover:text-white dark:bg-slate-800 dark:hover:bg-blue-900 text-slate-800 dark:text-slate-200 py-2 text-xs font-bold transition-all shadow-sm disabled:opacity-50"
                 >
                   <Download className="h-3.5 w-3.5" />
-                  Generate PoP Certificate PDF
+                  {generatingPdfId === pop.id ? 'Generating Certificate...' : 'Generate PoP Certificate PDF'}
                 </button>
               </div>
             </div>

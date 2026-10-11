@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState } from 'react';
-import confetti from 'canvas-confetti';
 import {
   ShieldAlert,
   ShieldCheck,
@@ -26,7 +25,6 @@ import {
 import { DealWithRelations, PIPELINE_STAGES, PipelineStage, formatKWD } from '@/lib/types';
 import { SafetyGateModal } from './SafetyGateModal';
 import { EditDealModal } from './EditDealModal';
-import { generateInsertionOrderPDF } from '@/lib/pdfGenerator';
 
 interface KanbanBoardProps {
   deals: DealWithRelations[];
@@ -155,11 +153,13 @@ export function KanbanBoard({ deals, onRefresh, onOpenNewDeal }: KanbanBoardProp
       }
 
       if (targetStage === 'CLOSED_WON') {
-        confetti({
-          particleCount: 100,
-          spread: 70,
-          origin: { y: 0.6 },
-        });
+        import('canvas-confetti').then(({ default: confetti }) => {
+          confetti({
+            particleCount: 100,
+            spread: 70,
+            origin: { y: 0.6 },
+          });
+        }).catch((e) => console.error(e));
       }
 
       onRefresh();
@@ -194,6 +194,15 @@ export function KanbanBoard({ deals, onRefresh, onOpenNewDeal }: KanbanBoardProp
       console.error(err);
     } finally {
       setUpdatingDealId(null);
+    }
+  };
+
+  const handleDownloadIO = async (deal: DealWithRelations) => {
+    try {
+      const { generateInsertionOrderPDF } = await import('@/lib/pdfGenerator');
+      generateInsertionOrderPDF(deal);
+    } catch (err) {
+      console.error('Failed to generate IO PDF:', err);
     }
   };
 
@@ -535,7 +544,7 @@ export function KanbanBoard({ deals, onRefresh, onOpenNewDeal }: KanbanBoardProp
                               {/* PDF Button */}
                               <button
                                 title="Download Insertion Order (IO) PDF"
-                                onClick={() => generateInsertionOrderPDF(deal)}
+                                onClick={() => handleDownloadIO(deal)}
                                 className="p-1 rounded text-slate-500 hover:text-[#002B66] hover:bg-blue-50 dark:hover:bg-slate-700 transition-colors cursor-pointer"
                               >
                                 <FileText className="h-3.5 w-3.5" />

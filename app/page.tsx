@@ -1,52 +1,136 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import dynamic from 'next/dynamic';
+import useSWR from 'swr';
 import { Header } from '@/components/Header';
-import { KanbanBoard } from '@/components/KanbanBoard';
-import { AvailsEngine } from '@/components/AvailsEngine';
-import { RateCardsTable } from '@/components/RateCardsTable';
-import { InsertionOrdersViewer } from '@/components/InsertionOrdersViewer';
-import { ProofOfPerformanceViewer } from '@/components/ProofOfPerformanceViewer';
-import { CompaniesDirectory } from '@/components/CompaniesDirectory';
-import { SettingsModule } from '@/components/SettingsModule';
-import { PitchDeckStatsDrawer } from '@/components/PitchDeckStatsDrawer';
-import { NewDealModal } from '@/components/NewDealModal';
-import { DealWithRelations, InventoryAssetWithBookings } from '@/lib/types';
-import { Plane, AlertTriangle, ShieldCheck, RefreshCw } from 'lucide-react';
+import { DealWithRelations } from '@/lib/types';
+import { RefreshCw } from 'lucide-react';
+
+function TabLoadingSkeleton({ label }: { label: string }) {
+  return (
+    <div className="h-64 flex flex-col items-center justify-center gap-3 text-slate-400">
+      <RefreshCw className="h-6 w-6 animate-spin text-[#002B66] dark:text-[#00A3E0]" />
+      <span className="text-xs font-semibold">Loading {label}...</span>
+    </div>
+  );
+}
+
+// Dynamic code-splitting for heavy tab views to reduce initial bundle
+const KanbanBoard = dynamic(
+  () => import('@/components/KanbanBoard').then((mod) => mod.KanbanBoard),
+  {
+    loading: () => <TabLoadingSkeleton label="Sales Pipeline" />,
+  }
+);
+
+const AvailsEngine = dynamic(
+  () => import('@/components/AvailsEngine').then((mod) => mod.AvailsEngine),
+  {
+    loading: () => <TabLoadingSkeleton label="T5 & Fleet Avails Engine" />,
+  }
+);
+
+const RateCardsTable = dynamic(
+  () => import('@/components/RateCardsTable').then((mod) => mod.RateCardsTable),
+  {
+    loading: () => <TabLoadingSkeleton label="Rate Cards & Catalog" />,
+  }
+);
+
+const InsertionOrdersViewer = dynamic(
+  () =>
+    import('@/components/InsertionOrdersViewer').then(
+      (mod) => mod.InsertionOrdersViewer
+    ),
+  {
+    loading: () => <TabLoadingSkeleton label="Insertion Orders (IO)" />,
+  }
+);
+
+const ProofOfPerformanceViewer = dynamic(
+  () =>
+    import('@/components/ProofOfPerformanceViewer').then(
+      (mod) => mod.ProofOfPerformanceViewer
+    ),
+  {
+    loading: () => <TabLoadingSkeleton label="Proof of Performance" />,
+  }
+);
+
+const CompaniesDirectory = dynamic(
+  () =>
+    import('@/components/CompaniesDirectory').then(
+      (mod) => mod.CompaniesDirectory
+    ),
+  {
+    loading: () => <TabLoadingSkeleton label="Advertisers & Agencies" />,
+  }
+);
+
+const SettingsModule = dynamic(
+  () => import('@/components/SettingsModule').then((mod) => mod.SettingsModule),
+  {
+    loading: () => <TabLoadingSkeleton label="Settings & Pricing Overrides" />,
+  }
+);
+
+const PitchDeckStatsDrawer = dynamic(
+  () =>
+    import('@/components/PitchDeckStatsDrawer').then(
+      (mod) => mod.PitchDeckStatsDrawer
+    ),
+  { ssr: false }
+);
+
+const NewDealModal = dynamic(
+  () => import('@/components/NewDealModal').then((mod) => mod.NewDealModal),
+  { ssr: false }
+);
+
+const fetcher = async (url: string) => {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+};
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState('pipeline');
-  const [deals, setDeals] = useState<DealWithRelations[]>([]);
-  const [assets, setAssets] = useState<any[]>([]);
-  const [companies, setCompanies] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-
   const [isPitchStatsOpen, setIsPitchStatsOpen] = useState(false);
   const [isNewDealOpen, setIsNewDealOpen] = useState(false);
 
-  const loadData = async () => {
-    try {
-      setLoading(true);
-      const [dealsRes, assetsRes, companiesRes] = await Promise.all([
-        fetch('/api/deals'),
-        fetch('/api/inventory'),
-        fetch('/api/companies'),
-      ]);
+  // SWR Caching & Stale-While-Revalidate data layer
+  const {
+    data: deals = [],
+    mutate: mutateDeals,
+    isLoading: dealsLoading,
+  } = useSWR<DealWithRelations[]>('/api/deals', fetcher, {
+    revalidateOnFocus: false,
+    dedupingInterval: 10000,
+  });
 
-      const [dealsData, assetsData, companiesData] = await Promise.all([
-        dealsRes.json(),
-        assetsRes.json(),
-        companiesRes.json(),
-      ]);
+  const {
+    data: assets = [],
+    mutate: mutateAssets,
+    isLoading: assetsLoading,
+  } = useSWR<any[]>('/api/inventory', fetcher, {
+    revalidateOnFocus: false,
+    dedupingInterval: 30000,
+  });
 
-      setDeals(Array.isArray(dealsData) ? dealsData : []);
-      setAssets(Array.isArray(assetsData) ? assetsData : []);
-      setCompanies(Array.isArray(companiesData) ? companiesData : []);
-    } catch (err) {
-      console.error('Error loading CRM data:', err);
-    } finally {
-      setLoading(false);
-    }
+  const {
+    data: companies = [],
+    mutate: mutateCompanies,
+    isLoading: companiesLoading,
+  } = useSWR<any[]>('/api/companies', fetcher, {
+    revalidateOnFocus: false,
+    dedupingInterval: 20000,
+  });
+
+  const refreshAll = () => {
+    mutateDeals();
+    mutateAssets();
+    mutateCompanies();
   };
 
   useEffect(() => {
@@ -57,12 +141,13 @@ export default function Home() {
         setActiveTab(tab);
       }
     }
-    loadData();
   }, []);
 
   const handleBookAsset = (assetId: string) => {
     setIsNewDealOpen(true);
   };
+
+  const initialLoading = dealsLoading && deals.length === 0;
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col">
@@ -76,7 +161,7 @@ export default function Home() {
 
       {/* Main Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {loading ? (
+        {initialLoading ? (
           <div className="h-96 flex flex-col items-center justify-center gap-3 text-slate-500">
             <RefreshCw className="h-8 w-8 animate-spin text-[#002B66] dark:text-[#00A3E0]" />
             <p className="text-xs font-semibold">
@@ -88,7 +173,7 @@ export default function Home() {
             {activeTab === 'pipeline' && (
               <KanbanBoard
                 deals={deals}
-                onRefresh={loadData}
+                onRefresh={mutateDeals}
                 onOpenNewDeal={() => setIsNewDealOpen(true)}
               />
             )}
@@ -106,13 +191,13 @@ export default function Home() {
             )}
 
             {activeTab === 'pop' && (
-              <ProofOfPerformanceViewer deals={deals} onRefresh={loadData} />
+              <ProofOfPerformanceViewer deals={deals} onRefresh={mutateDeals} />
             )}
 
             {activeTab === 'companies' && (
               <CompaniesDirectory
                 companies={companies}
-                onRefresh={loadData}
+                onRefresh={mutateCompanies}
                 onOpenNewDeal={() => setIsNewDealOpen(true)}
               />
             )}
@@ -120,7 +205,7 @@ export default function Home() {
             {activeTab === 'settings' && (
               <SettingsModule
                 assets={assets}
-                onRefreshAssets={loadData}
+                onRefreshAssets={mutateAssets}
               />
             )}
           </>
@@ -137,7 +222,7 @@ export default function Home() {
       <NewDealModal
         isOpen={isNewDealOpen}
         onClose={() => setIsNewDealOpen(false)}
-        onDealCreated={loadData}
+        onDealCreated={refreshAll}
       />
 
       {/* Footer */}

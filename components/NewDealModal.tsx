@@ -1,8 +1,11 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import useSWR from 'swr';
 import { X, Plus, Trash2, ShieldAlert, Sparkles, Building2, Calendar, Banknote, AlertTriangle } from 'lucide-react';
 import { InventoryAssetWithBookings } from '@/lib/types';
+
+const modalFetcher = (url: string) => fetch(url).then((res) => res.json());
 
 interface NewDealModalProps {
   isOpen: boolean;
@@ -12,10 +15,19 @@ interface NewDealModalProps {
 
 export function NewDealModal({ isOpen, onClose, onDealCreated }: NewDealModalProps) {
   const [title, setTitle] = useState('');
-  const [companies, setCompanies] = useState<any[]>([]);
   const [selectedCompanyId, setSelectedCompanyId] = useState('');
   const [selectedContactId, setSelectedContactId] = useState('');
-  const [assets, setAssets] = useState<InventoryAssetWithBookings[]>([]);
+
+  // Cached via SWR with deduping
+  const { data: companies = [] } = useSWR<any[]>(isOpen ? '/api/companies' : null, modalFetcher, {
+    dedupingInterval: 30000,
+    revalidateOnFocus: false,
+  });
+
+  const { data: assets = [] } = useSWR<InventoryAssetWithBookings[]>(isOpen ? '/api/inventory' : null, modalFetcher, {
+    dedupingInterval: 30000,
+    revalidateOnFocus: false,
+  });
 
   const [targetStartDate, setTargetStartDate] = useState('2026-10-01');
   const [targetEndDate, setTargetEndDate] = useState('2026-10-31');
@@ -41,11 +53,13 @@ export function NewDealModal({ isOpen, onClose, onDealCreated }: NewDealModalPro
   const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
-    if (isOpen) {
-      fetchCompanies();
-      fetchAssets();
+    if (companies.length > 0 && !selectedCompanyId) {
+      setSelectedCompanyId(companies[0].id);
+      if (companies[0].contacts?.length > 0) {
+        setSelectedContactId(companies[0].contacts[0].id);
+      }
     }
-  }, [isOpen]);
+  }, [companies, selectedCompanyId]);
 
   const checkAssetAvailability = (assetId: string) => {
     const asset = assets.find((a) => a.id === assetId);
@@ -86,32 +100,6 @@ export function NewDealModal({ isOpen, onClose, onDealCreated }: NewDealModalPro
         ? `Confirmed booked by ${firstConflict?.deal?.company?.name || 'another advertiser'}`
         : undefined,
     };
-  };
-
-  const fetchCompanies = async () => {
-    try {
-      const res = await fetch('/api/companies');
-      const data = await res.json();
-      setCompanies(data);
-      if (data.length > 0 && !selectedCompanyId) {
-        setSelectedCompanyId(data[0].id);
-        if (data[0].contacts?.length > 0) {
-          setSelectedContactId(data[0].contacts[0].id);
-        }
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const fetchAssets = async () => {
-    try {
-      const res = await fetch('/api/inventory');
-      const data = await res.json();
-      setAssets(data);
-    } catch (err) {
-      console.error(err);
-    }
   };
 
   const handleCompanyChange = (companyId: string) => {

@@ -24,18 +24,94 @@ export async function GET(request: Request) {
       ];
     }
 
+    const limit = Math.min(Number(searchParams.get('limit')) || 100, 200);
+    const skip = Number(searchParams.get('skip')) || 0;
+
     const deals = await prisma.deal.findMany({
       where: whereClause,
-      include: {
-        company: true,
-        contact: true,
+      take: limit,
+      skip: skip,
+      select: {
+        id: true,
+        dealCode: true,
+        title: true,
+        companyId: true,
+        contactId: true,
+        grossValueKWD: true,
+        discountType: true,
+        discountValue: true,
+        discountAmountKWD: true,
+        totalValueKWD: true,
+        stage: true,
+        targetStartDate: true,
+        targetEndDate: true,
+        aviationApproval: true,
+        aviationSafetyNotes: true,
+        flammabilityCertified: true,
+        scannerChecked: true,
+        dgcaPermitNo: true,
+        cancellationReason: true,
+        notes: true,
+        createdAt: true,
+        updatedAt: true,
+        company: {
+          select: {
+            id: true,
+            name: true,
+            type: true,
+            industry: true,
+            contactEmail: true,
+            phone: true,
+            billingAddress: true,
+          },
+        },
+        contact: {
+          select: {
+            id: true,
+            name: true,
+            role: true,
+            email: true,
+            phone: true,
+          },
+        },
         bookingSlots: {
-          include: {
-            asset: true,
+          select: {
+            id: true,
+            dealId: true,
+            assetId: true,
+            startDate: true,
+            endDate: true,
+            slotIndex: true,
+            agreedRateKWD: true,
+            productionIncluded: true,
+            notes: true,
+            asset: {
+              select: {
+                id: true,
+                code: true,
+                name: true,
+                environment: true,
+                category: true,
+                dimensions: true,
+                isDigitalLoop: true,
+                loopMaxClients: true,
+                status: true,
+              },
+            },
           },
         },
         proofOfPerformances: {
-          include: {
+          select: {
+            id: true,
+            dealId: true,
+            assetId: true,
+            flightNumberOrLocation: true,
+            timestamp: true,
+            photoUrls: true,
+            certifiedBy: true,
+            inspectorRole: true,
+            complianceStatus: true,
+            inspectionNotes: true,
             asset: {
               select: {
                 code: true,
@@ -48,7 +124,11 @@ export async function GET(request: Request) {
       orderBy: { createdAt: 'desc' },
     });
 
-    return NextResponse.json(deals);
+    return NextResponse.json(deals, {
+      headers: {
+        'Cache-Control': 'private, max-age=5, stale-while-revalidate=30',
+      },
+    });
   } catch (error) {
     console.error('Error fetching deals:', error);
     const details = error instanceof Error ? error.message : String(error);

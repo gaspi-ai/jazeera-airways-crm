@@ -1,36 +1,33 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import useSWR from 'swr';
 import { Header } from '@/components/Header';
 import { SettingsModule } from '@/components/SettingsModule';
 import { PitchDeckStatsDrawer } from '@/components/PitchDeckStatsDrawer';
 import { NewDealModal } from '@/components/NewDealModal';
 import { RefreshCw } from 'lucide-react';
 
+const fetcher = async (url: string) => {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+};
+
 export default function SettingsPage() {
   const router = useRouter();
-  const [assets, setAssets] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [isPitchStatsOpen, setIsPitchStatsOpen] = useState(false);
   const [isNewDealOpen, setIsNewDealOpen] = useState(false);
 
-  const loadAssets = async () => {
-    try {
-      setLoading(true);
-      const res = await fetch('/api/inventory');
-      const data = await res.json();
-      setAssets(Array.isArray(data) ? data : []);
-    } catch (err) {
-      console.error('Error loading inventory assets:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadAssets();
-  }, []);
+  const {
+    data: assets = [],
+    mutate: mutateAssets,
+    isLoading,
+  } = useSWR<any[]>('/api/inventory', fetcher, {
+    revalidateOnFocus: false,
+    dedupingInterval: 30000,
+  });
 
   const handleTabChange = (tab: string) => {
     if (tab === 'settings') return;
@@ -47,13 +44,13 @@ export default function SettingsPage() {
       />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {loading ? (
+        {isLoading && assets.length === 0 ? (
           <div className="h-96 flex flex-col items-center justify-center gap-3 text-slate-500">
             <RefreshCw className="h-8 w-8 animate-spin text-[#002B66] dark:text-[#00A3E0]" />
             <p className="text-xs font-semibold">Loading Jazeera CRM Settings & Rate Cards...</p>
           </div>
         ) : (
-          <SettingsModule assets={assets} onRefreshAssets={loadAssets} />
+          <SettingsModule assets={assets} onRefreshAssets={() => mutateAssets()} />
         )}
       </main>
 
@@ -65,7 +62,7 @@ export default function SettingsPage() {
       <NewDealModal
         isOpen={isNewDealOpen}
         onClose={() => setIsNewDealOpen(false)}
-        onDealCreated={loadAssets}
+        onDealCreated={() => mutateAssets()}
       />
 
       <footer className="bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 py-4 text-center text-xs text-slate-500">

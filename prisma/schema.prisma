@@ -24,6 +24,10 @@ model Company {
   createdAt      DateTime  @default(now())
   contacts       Contact[]
   deals          Deal[]
+
+  @@index([isArchived])
+  @@index([type])
+  @@index([name])
 }
 
 model Contact {
@@ -36,6 +40,8 @@ model Contact {
   phone     String?
   createdAt DateTime @default(now())
   deals     Deal[]
+
+  @@index([companyId])
 }
 
 model InventoryAsset {
@@ -61,6 +67,10 @@ model InventoryAsset {
   createdAt            DateTime             @default(now())
   bookingSlots         BookingSlot[]
   proofOfPerformances  ProofOfPerformance[]
+
+  @@index([status])
+  @@index([category])
+  @@index([environment])
 }
 
 model Deal {
@@ -77,16 +87,6 @@ model Deal {
   discountAmountKWD      Float                @default(0)
   totalValueKWD          Float                @default(0) // Net Value after discount
   stage                  String               @default("RFP_RECEIVED")
-  // Stages:
-  // 1: RFP_RECEIVED
-  // 2: CONCEPT_PITCH
-  // 3: MEDIA_PLAN_SENT
-  // 4: AVIATION_SAFETY_APPROVAL
-  // 5: IO_SIGNED
-  // 6: IN_PRODUCTION
-  // 7: INSTALLED_POP_DELIVERED
-  // 8: CLOSED_WON
-  // 9: CLOSED_LOST
   targetStartDate        DateTime?
   targetEndDate          DateTime?
   aviationApproval       Boolean              @default(false)
@@ -100,6 +100,10 @@ model Deal {
   updatedAt              DateTime             @updatedAt
   bookingSlots           BookingSlot[]
   proofOfPerformances    ProofOfPerformance[]
+
+  @@index([companyId])
+  @@index([stage])
+  @@index([createdAt])
 }
 
 model BookingSlot {
@@ -115,6 +119,10 @@ model BookingSlot {
   productionIncluded Boolean        @default(false)
   notes              String?
   createdAt          DateTime       @default(now())
+
+  @@index([assetId])
+  @@index([dealId])
+  @@index([startDate, endDate])
 }
 
 model ProofOfPerformance {
@@ -131,6 +139,9 @@ model ProofOfPerformance {
   complianceStatus       String         @default("VERIFIED") // VERIFIED | PENDING_INSPECTION | REJECTED
   inspectionNotes        String?
   createdAt              DateTime       @default(now())
+
+  @@index([dealId])
+  @@index([assetId])
 }
 
 model SystemSetting {
