@@ -13,7 +13,7 @@ import {
   UserCheck,
   Sparkles,
 } from 'lucide-react';
-import { DealWithRelations } from '@/lib/types';
+import { DealWithRelations, formatDate } from '@/lib/types';
 import { generateProofOfPerformancePDF } from '@/lib/pdfGenerator';
 
 interface ProofOfPerformanceViewerProps {
@@ -189,7 +189,7 @@ export function ProofOfPerformanceViewer({ deals, onRefresh }: ProofOfPerformanc
                     </div>
                     <div className="flex items-center gap-1.5 text-[10px] text-slate-500">
                       <Calendar className="h-3.5 w-3.5 shrink-0" />
-                      <span>{new Date(pop.timestamp).toLocaleString('en-GB')}</span>
+                      <span>{formatDate(pop.timestamp)}</span>
                     </div>
                   </div>
 

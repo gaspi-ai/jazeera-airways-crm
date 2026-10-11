@@ -15,7 +15,7 @@ import {
   Filter,
   Users,
 } from 'lucide-react';
-import { InventoryAssetWithBookings, formatKWD } from '@/lib/types';
+import { InventoryAssetWithBookings, formatKWD, formatDate } from '@/lib/types';
 
 interface AvailsEngineProps {
   assets: (InventoryAssetWithBookings & {
@@ -330,8 +330,7 @@ export function AvailsEngine({ assets, onBookAsset }: AvailsEngineProps) {
                           Slot {b.slotIndex}
                         </span>
                         <div className="text-[10px] text-slate-500">
-                          {new Date(b.startDate).toLocaleDateString()} -{' '}
-                          {new Date(b.endDate).toLocaleDateString()}
+                          {formatDate(b.startDate)} - {formatDate(b.endDate)}
                         </div>
                       </div>
                     </div>

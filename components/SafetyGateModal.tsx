@@ -29,13 +29,24 @@ export function SafetyGateModal({
     deal?.scannerChecked || false
   );
   const [dgcaPermitNo, setDgcaPermitNo] = useState(
-    deal?.dgcaPermitNo || `DGCA-MED-2026-${Math.floor(100 + Math.random() * 900)}`
+    deal?.dgcaPermitNo || 'DGCA-MED-2026-105'
   );
   const [safetyNotes, setSafetyNotes] = useState(
     deal?.aviationSafetyNotes ||
       'Verified compliant with FAA FAR 25.853 Appendix F Part I and Kuwait DGCA Terminal 5 fire safety standards.'
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  React.useEffect(() => {
+    if (deal) {
+      setFlammabilityCertified(deal.flammabilityCertified || false);
+      setScannerChecked(deal.scannerChecked || false);
+      setDgcaPermitNo(deal.dgcaPermitNo || `DGCA-MED-2026-${deal.dealCode.split('-').pop() || '105'}`);
+      if (deal.aviationSafetyNotes) {
+        setSafetyNotes(deal.aviationSafetyNotes);
+      }
+    }
+  }, [deal]);
 
   if (!isOpen || !deal) return null;
 

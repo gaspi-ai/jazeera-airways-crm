@@ -12,7 +12,7 @@ import {
   Calendar,
   Sparkles,
 } from 'lucide-react';
-import { DealWithRelations, formatKWD } from '@/lib/types';
+import { DealWithRelations, formatKWD, formatDate } from '@/lib/types';
 import { generateInsertionOrderPDF } from '@/lib/pdfGenerator';
 
 interface InsertionOrdersViewerProps {
@@ -92,8 +92,7 @@ export function InsertionOrdersViewer({ deals }: InsertionOrdersViewerProps) {
                       <div className="flex items-center gap-1">
                         <Calendar className="h-3 w-3 text-slate-400" />
                         <span>
-                          {deal.targetStartDate ? new Date(deal.targetStartDate).toLocaleDateString() : 'TBD'} -{' '}
-                          {deal.targetEndDate ? new Date(deal.targetEndDate).toLocaleDateString() : 'TBD'}
+                          {formatDate(deal.targetStartDate)} - {formatDate(deal.targetEndDate)}
                         </span>
                       </div>
                     </td>
@@ -164,7 +163,7 @@ export function InsertionOrdersViewer({ deals }: InsertionOrdersViewerProps) {
                   Terminal 5 & In-Flight Media Network | Insertion Order
                 </p>
                 <p className="text-[11px] text-sky-200 mt-0.5">
-                  Ref: {selectedDealForPreview.dealCode} • Date: {new Date().toLocaleDateString()}
+                  Ref: {selectedDealForPreview.dealCode} • Date: {formatDate(selectedDealForPreview.createdAt)}
                 </p>
               </div>
               <button
@@ -202,8 +201,8 @@ export function InsertionOrdersViewer({ deals }: InsertionOrdersViewerProps) {
                     {selectedDealForPreview.title}
                   </p>
                   <p className="text-[11px] text-slate-500">
-                    Flight: {selectedDealForPreview.targetStartDate ? new Date(selectedDealForPreview.targetStartDate).toLocaleDateString() : 'TBD'} to{' '}
-                    {selectedDealForPreview.targetEndDate ? new Date(selectedDealForPreview.targetEndDate).toLocaleDateString() : 'TBD'}
+                    Flight: {formatDate(selectedDealForPreview.targetStartDate)} to{' '}
+                    {formatDate(selectedDealForPreview.targetEndDate)}
                   </p>
                   <p className="text-[11px] text-slate-500 mt-1">
                     DGCA Permit: {selectedDealForPreview.dgcaPermitNo || 'DGCA-MED-2026-COMPLIANT'}
