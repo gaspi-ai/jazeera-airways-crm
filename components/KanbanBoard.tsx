@@ -25,6 +25,7 @@ import {
 import { DealWithRelations, PIPELINE_STAGES, PipelineStage, formatKWD } from '@/lib/types';
 import { SafetyGateModal } from './SafetyGateModal';
 import { EditDealModal } from './EditDealModal';
+import { DealBriefModal } from './DealBriefModal';
 
 interface KanbanBoardProps {
   deals: DealWithRelations[];
@@ -40,6 +41,10 @@ export function KanbanBoard({ deals, onRefresh, onOpenNewDeal }: KanbanBoardProp
   // Edit deal state
   const [selectedDealForEdit, setSelectedDealForEdit] = useState<DealWithRelations | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+
+  // Deal Brief state
+  const [selectedDealForBrief, setSelectedDealForBrief] = useState<DealWithRelations | null>(null);
+  const [isBriefModalOpen, setIsBriefModalOpen] = useState(false);
 
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState('');
@@ -100,7 +105,8 @@ export function KanbanBoard({ deals, onRefresh, onOpenNewDeal }: KanbanBoardProp
     const grossVal = deal.grossValueKWD || netVal;
     const discVal = deal.discountAmountKWD || 0;
 
-    if (deal.stage !== 'CLOSED_LOST') {
+    // Active Sales Pipeline (unclosed active opportunities)
+    if (deal.stage !== 'CLOSED_LOST' && deal.stage !== 'CLOSED_WON') {
       totalGrossKWD += grossVal;
       totalDiscountsKWD += discVal;
       totalPipelineKWD += netVal;
@@ -437,7 +443,11 @@ export function KanbanBoard({ deals, onRefresh, onOpenNewDeal }: KanbanBoardProp
                       return (
                         <div
                           key={deal.id}
-                          className={`rounded-xl bg-white dark:bg-slate-800/90 border p-3.5 shadow-sm hover:shadow-md transition-all relative group ${
+                          onClick={() => {
+                            setSelectedDealForBrief(deal);
+                            setIsBriefModalOpen(true);
+                          }}
+                          className={`rounded-xl bg-white dark:bg-slate-800/90 border p-3.5 shadow-sm hover:shadow-md hover:border-sky-400 dark:hover:border-sky-500 cursor-pointer transition-all relative group ${
                             deal.aviationApproval
                               ? 'border-slate-200 dark:border-slate-700/80'
                               : 'border-amber-300 dark:border-amber-700/60'
@@ -445,9 +455,14 @@ export function KanbanBoard({ deals, onRefresh, onOpenNewDeal }: KanbanBoardProp
                         >
                           {/* Deal Code & Value */}
                           <div className="flex items-start justify-between gap-2">
-                            <span className="font-mono text-[10px] font-bold text-[#002B66] dark:text-sky-400 bg-blue-50 dark:bg-blue-950/80 px-1.5 py-0.5 rounded">
-                              {deal.dealCode}
-                            </span>
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-mono text-[10px] font-bold text-[#002B66] dark:text-sky-400 bg-blue-50 dark:bg-blue-950/80 px-1.5 py-0.5 rounded">
+                                {deal.dealCode}
+                              </span>
+                              <span className="opacity-0 group-hover:opacity-100 transition-opacity text-[9.5px] font-semibold text-sky-600 dark:text-sky-400">
+                                View Brief
+                              </span>
+                            </div>
                             <div className="text-right">
                               <span className="font-black text-xs text-slate-900 dark:text-slate-100 block">
                                 {formatKWD(deal.totalValueKWD)}
@@ -507,7 +522,8 @@ export function KanbanBoard({ deals, onRefresh, onOpenNewDeal }: KanbanBoardProp
                               </span>
                             ) : (
                               <button
-                                onClick={() => {
+                                onClick={(e) => {
+                                  e.stopPropagation();
                                   setSelectedDealForSafety(deal);
                                   setIsSafetyModalOpen(true);
                                 }}
@@ -532,7 +548,8 @@ export function KanbanBoard({ deals, onRefresh, onOpenNewDeal }: KanbanBoardProp
                               {/* Edit Deal Button */}
                               <button
                                 title="Edit Deal & Pricing"
-                                onClick={() => {
+                                onClick={(e) => {
+                                  e.stopPropagation();
                                   setSelectedDealForEdit(deal);
                                   setIsEditModalOpen(true);
                                 }}
@@ -544,7 +561,10 @@ export function KanbanBoard({ deals, onRefresh, onOpenNewDeal }: KanbanBoardProp
                               {/* PDF Button */}
                               <button
                                 title="Download Insertion Order (IO) PDF"
-                                onClick={() => handleDownloadIO(deal)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDownloadIO(deal);
+                                }}
                                 className="p-1 rounded text-slate-500 hover:text-[#002B66] hover:bg-blue-50 dark:hover:bg-slate-700 transition-colors cursor-pointer"
                               >
                                 <FileText className="h-3.5 w-3.5" />
@@ -554,7 +574,10 @@ export function KanbanBoard({ deals, onRefresh, onOpenNewDeal }: KanbanBoardProp
                               {deal.stage !== 'CLOSED_LOST' && (
                                 <button
                                   title="Cancel Deal"
-                                  onClick={() => handleCancelDeal(deal)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleCancelDeal(deal);
+                                  }}
                                   className="p-1 rounded text-slate-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-slate-700 transition-colors cursor-pointer"
                                 >
                                   <XCircle className="h-3.5 w-3.5" />
@@ -564,7 +587,10 @@ export function KanbanBoard({ deals, onRefresh, onOpenNewDeal }: KanbanBoardProp
                               {/* Delete Deal Button */}
                               <button
                                 title="Delete Deal"
-                                onClick={() => setDealToDelete(deal)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDealToDelete(deal);
+                                }}
                                 className="p-1 rounded text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-slate-700 transition-colors cursor-pointer"
                               >
                                 <Trash2 className="h-3.5 w-3.5" />
@@ -576,9 +602,10 @@ export function KanbanBoard({ deals, onRefresh, onOpenNewDeal }: KanbanBoardProp
                               {stageIndex > 0 && (
                                 <button
                                   title={`Move back to ${PIPELINE_STAGES[stageIndex - 1].label}`}
-                                  onClick={() =>
-                                    handleStageChange(deal, PIPELINE_STAGES[stageIndex - 1].id)
-                                  }
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleStageChange(deal, PIPELINE_STAGES[stageIndex - 1].id);
+                                  }}
                                   className="p-1 rounded text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer"
                                 >
                                   <ChevronLeft className="h-3.5 w-3.5" />
@@ -588,9 +615,10 @@ export function KanbanBoard({ deals, onRefresh, onOpenNewDeal }: KanbanBoardProp
                               {stageIndex < PIPELINE_STAGES.length - 1 && (
                                 <button
                                   title={`Advance to ${PIPELINE_STAGES[stageIndex + 1].label}`}
-                                  onClick={() =>
-                                    handleStageChange(deal, PIPELINE_STAGES[stageIndex + 1].id)
-                                  }
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleStageChange(deal, PIPELINE_STAGES[stageIndex + 1].id);
+                                  }}
                                   className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold transition-all cursor-pointer ${
                                     PIPELINE_STAGES[stageIndex + 1].id === 'IO_SIGNED' &&
                                     !deal.aviationApproval
@@ -622,6 +650,41 @@ export function KanbanBoard({ deals, onRefresh, onOpenNewDeal }: KanbanBoardProp
           onClose={() => setIsSafetyModalOpen(false)}
           deal={selectedDealForSafety}
           onApproveAndAdvance={handleApproveSafetyAndAdvance}
+        />
+      )}
+
+      {/* Deal Brief Modal */}
+      {selectedDealForBrief && (
+        <DealBriefModal
+          isOpen={isBriefModalOpen}
+          deal={
+            deals.find((d) => d.id === selectedDealForBrief.id) || selectedDealForBrief
+          }
+          onClose={() => {
+            setIsBriefModalOpen(false);
+            setSelectedDealForBrief(null);
+          }}
+          onEdit={(deal) => {
+            setIsBriefModalOpen(false);
+            setSelectedDealForEdit(deal);
+            setIsEditModalOpen(true);
+          }}
+          onDelete={(deal) => {
+            setIsBriefModalOpen(false);
+            setDealToDelete(deal);
+          }}
+          onCancelDeal={async (deal) => {
+            setIsBriefModalOpen(false);
+            await handleCancelDeal(deal);
+          }}
+          onStageChange={async (deal, targetStage) => {
+            await handleStageChange(deal, targetStage);
+          }}
+          onApproveSafety={(deal) => {
+            setIsBriefModalOpen(false);
+            setSelectedDealForSafety(deal);
+            setIsSafetyModalOpen(true);
+          }}
         />
       )}
 

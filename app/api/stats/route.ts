@@ -45,7 +45,8 @@ export async function GET() {
         stageMap[deal.stage].value += netVal;
       }
 
-      if (deal.stage !== 'CLOSED_LOST') {
+      // Active Sales Pipeline (unclosed active opportunities)
+      if (deal.stage !== 'CLOSED_LOST' && deal.stage !== 'CLOSED_WON') {
         totalPipelineValueKWD += netVal;
         totalGrossValueKWD += grossVal;
         totalDiscountsKWD += discVal;
