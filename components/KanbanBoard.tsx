@@ -21,11 +21,13 @@ import {
   XCircle,
   Percent,
   Banknote,
+  TrendingUp,
 } from 'lucide-react';
 import { DealWithRelations, PIPELINE_STAGES, PipelineStage, formatKWD } from '@/lib/types';
 import { SafetyGateModal } from './SafetyGateModal';
 import { EditDealModal } from './EditDealModal';
 import { DealBriefModal } from './DealBriefModal';
+import { KpiCardDrilldownModal, KpiCardType } from './KpiCardDrilldownModal';
 
 interface KanbanBoardProps {
   deals: DealWithRelations[];
@@ -45,6 +47,11 @@ export function KanbanBoard({ deals, onRefresh, onOpenNewDeal }: KanbanBoardProp
   // Deal Brief state
   const [selectedDealForBrief, setSelectedDealForBrief] = useState<DealWithRelations | null>(null);
   const [isBriefModalOpen, setIsBriefModalOpen] = useState(false);
+
+  // KPI Card Drilldown state
+  const [selectedKpiCard, setSelectedKpiCard] = useState<KpiCardType | null>(null);
+  const [isKpiModalOpen, setIsKpiModalOpen] = useState(false);
+  const [activeKpiFilter, setActiveKpiFilter] = useState<'ALL' | KpiCardType>('ALL');
 
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState('');
@@ -72,7 +79,14 @@ export function KanbanBoard({ deals, onRefresh, onOpenNewDeal }: KanbanBoardProp
       (safetyFilter === 'CLEARED' && deal.aviationApproval) ||
       (safetyFilter === 'PENDING' && !deal.aviationApproval);
 
-    return matchesSearch && matchesCompany && matchesSafety;
+    const matchesKpi =
+      activeKpiFilter === 'ALL' ||
+      (activeKpiFilter === 'PIPELINE' && deal.stage !== 'CLOSED_LOST' && deal.stage !== 'CLOSED_WON') ||
+      (activeKpiFilter === 'CLOSED_WON' && deal.stage === 'CLOSED_WON') ||
+      (activeKpiFilter === 'PRODUCTION' && (deal.stage === 'IN_PRODUCTION' || deal.stage === 'IO_SIGNED')) ||
+      (activeKpiFilter === 'SAFETY' && !deal.aviationApproval && deal.stage !== 'CLOSED_LOST');
+
+    return matchesSearch && matchesCompany && matchesSafety && matchesKpi;
   });
 
   // Group deals by stage
@@ -119,6 +133,17 @@ export function KanbanBoard({ deals, onRefresh, onOpenNewDeal }: KanbanBoardProp
       inProductionKWD += netVal;
     }
   });
+
+  const pipelineDealsCount = deals.filter(
+    (d) => d.stage !== 'CLOSED_LOST' && d.stage !== 'CLOSED_WON'
+  ).length;
+  const closedWonDealsCount = deals.filter((d) => d.stage === 'CLOSED_WON').length;
+  const inProductionDealsCount = deals.filter(
+    (d) => d.stage === 'IN_PRODUCTION' || d.stage === 'IO_SIGNED'
+  ).length;
+  const safetyPendingCount = deals.filter(
+    (d) => !d.aviationApproval && d.stage !== 'CLOSED_LOST'
+  ).length;
 
   const pendingSafetyApprovalCount = deals.filter(
     (d) => !d.aviationApproval && !['CLOSED_LOST', 'CLOSED_WON'].includes(d.stage)
@@ -273,12 +298,30 @@ export function KanbanBoard({ deals, onRefresh, onOpenNewDeal }: KanbanBoardProp
     <div className="space-y-6">
       {/* Financial KPIs Banner */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="rounded-2xl bg-gradient-to-br from-[#002B66] via-[#0B2545] to-[#133E87] text-white p-4.5 shadow-lg border border-sky-500/20">
+        {/* Card 1: Net Pipeline Revenue */}
+        <div
+          onClick={() => {
+            setSelectedKpiCard('PIPELINE');
+            setIsKpiModalOpen(true);
+          }}
+          className={`rounded-2xl bg-gradient-to-br from-[#002B66] via-[#0B2545] to-[#133E87] text-white p-4.5 shadow-lg border transition-all cursor-pointer group hover:scale-[1.015] hover:shadow-2xl relative ${
+            activeKpiFilter === 'PIPELINE'
+              ? 'ring-2 ring-[#FFC72C] border-[#FFC72C]'
+              : 'border-sky-500/20 hover:border-sky-400/50'
+          }`}
+        >
           <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-sky-200">
-            <span>Net Pipeline Revenue</span>
-            {totalDiscountsKWD > 0 && (
+            <span className="flex items-center gap-1.5">
+              <TrendingUp className="h-3.5 w-3.5 text-sky-300" />
+              Net Pipeline Revenue
+            </span>
+            {totalDiscountsKWD > 0 ? (
               <span className="text-[10px] text-[#FFC72C] bg-white/10 px-1.5 py-0.5 rounded">
                 -{formatKWD(totalDiscountsKWD)} Disc.
+              </span>
+            ) : (
+              <span className="text-[9.5px] text-sky-300/80 bg-white/10 px-1.5 py-0.5 rounded">
+                Active Deals
               </span>
             )}
           </div>
@@ -289,11 +332,36 @@ export function KanbanBoard({ deals, onRefresh, onOpenNewDeal }: KanbanBoardProp
             <span>Weighted: {formatKWD(Math.round(weightedRevenueKWD))}</span>
             <span className="text-[10px] text-slate-300">Gross: {formatKWD(totalGrossKWD)}</span>
           </div>
+          <div className="mt-3 pt-2.5 border-t border-sky-400/20 flex items-center justify-between text-[11px] font-bold text-sky-200 group-hover:text-white transition-colors">
+            <span className="flex items-center gap-1">
+              Manage Pipeline ({pipelineDealsCount} {pipelineDealsCount === 1 ? 'deal' : 'deals'})
+            </span>
+            <span className="flex items-center gap-0.5 text-[#FFC72C] group-hover:translate-x-0.5 transition-transform text-[10.5px]">
+              View Briefs <ChevronRight className="h-3.5 w-3.5" />
+            </span>
+          </div>
         </div>
 
-        <div className="rounded-2xl bg-gradient-to-br from-emerald-800 to-teal-900 text-white p-4.5 shadow-lg border border-emerald-500/30">
-          <div className="text-[11px] font-bold uppercase tracking-wider text-emerald-200">
-            Closed Won (Airline Revenue)
+        {/* Card 2: Closed Won */}
+        <div
+          onClick={() => {
+            setSelectedKpiCard('CLOSED_WON');
+            setIsKpiModalOpen(true);
+          }}
+          className={`rounded-2xl bg-gradient-to-br from-emerald-800 to-teal-900 text-white p-4.5 shadow-lg border transition-all cursor-pointer group hover:scale-[1.015] hover:shadow-2xl relative ${
+            activeKpiFilter === 'CLOSED_WON'
+              ? 'ring-2 ring-emerald-300 border-emerald-300'
+              : 'border-emerald-500/30 hover:border-emerald-400/50'
+          }`}
+        >
+          <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-emerald-200">
+            <span className="flex items-center gap-1.5">
+              <CheckCircle className="h-3.5 w-3.5 text-emerald-300" />
+              Closed Won (Airline Revenue)
+            </span>
+            <span className="text-[9.5px] text-emerald-200 bg-white/10 px-1.5 py-0.5 rounded">
+              Contracted
+            </span>
           </div>
           <div className="text-2xl font-black mt-1 text-emerald-100">
             {formatKWD(closedWonKWD)}
@@ -302,31 +370,88 @@ export function KanbanBoard({ deals, onRefresh, onOpenNewDeal }: KanbanBoardProp
             <CheckCircle className="h-3.5 w-3.5 text-emerald-300" />
             <span>100% Recognized Airline Revenue</span>
           </div>
+          <div className="mt-3 pt-2.5 border-t border-emerald-400/20 flex items-center justify-between text-[11px] font-bold text-emerald-200 group-hover:text-white transition-colors">
+            <span className="flex items-center gap-1">
+              Manage Contracts ({closedWonDealsCount} {closedWonDealsCount === 1 ? 'deal' : 'deals'})
+            </span>
+            <span className="flex items-center gap-0.5 text-emerald-100 group-hover:translate-x-0.5 transition-transform text-[10.5px]">
+              View Briefs <ChevronRight className="h-3.5 w-3.5" />
+            </span>
+          </div>
         </div>
 
-        <div className="rounded-2xl bg-gradient-to-br from-purple-800 to-indigo-900 text-white p-4.5 shadow-lg border border-purple-500/30">
-          <div className="text-[11px] font-bold uppercase tracking-wider text-purple-200">
-            In Print / Production
+        {/* Card 3: In Production */}
+        <div
+          onClick={() => {
+            setSelectedKpiCard('PRODUCTION');
+            setIsKpiModalOpen(true);
+          }}
+          className={`rounded-2xl bg-gradient-to-br from-purple-800 to-indigo-900 text-white p-4.5 shadow-lg border transition-all cursor-pointer group hover:scale-[1.015] hover:shadow-2xl relative ${
+            activeKpiFilter === 'PRODUCTION'
+              ? 'ring-2 ring-purple-300 border-purple-300'
+              : 'border-purple-500/30 hover:border-purple-400/50'
+          }`}
+        >
+          <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-purple-200">
+            <span className="flex items-center gap-1.5">
+              <Clock className="h-3.5 w-3.5 text-purple-300" />
+              In Print / Production
+            </span>
+            <span className="text-[9.5px] text-purple-200 bg-white/10 px-1.5 py-0.5 rounded">
+              4-Wk Lead
+            </span>
           </div>
           <div className="text-2xl font-black mt-1 text-purple-100">
             {formatKWD(inProductionKWD)}
           </div>
           <div className="text-[11px] text-purple-200 mt-1 flex items-center gap-1">
             <Clock className="h-3.5 w-3.5 text-purple-300" />
-            <span>4-Week Fabrication Window</span>
+            <span>Fabrication & Vinyl Prep</span>
+          </div>
+          <div className="mt-3 pt-2.5 border-t border-purple-400/20 flex items-center justify-between text-[11px] font-bold text-purple-200 group-hover:text-white transition-colors">
+            <span className="flex items-center gap-1">
+              Manage Queue ({inProductionDealsCount} {inProductionDealsCount === 1 ? 'deal' : 'deals'})
+            </span>
+            <span className="flex items-center gap-0.5 text-purple-100 group-hover:translate-x-0.5 transition-transform text-[10.5px]">
+              View Briefs <ChevronRight className="h-3.5 w-3.5" />
+            </span>
           </div>
         </div>
 
-        <div className="rounded-2xl bg-gradient-to-br from-amber-600 to-orange-700 text-white p-4.5 shadow-lg border border-amber-500/30">
-          <div className="text-[11px] font-bold uppercase tracking-wider text-amber-100 flex items-center justify-between">
-            <span>Aviation Safety Gate</span>
-            <ShieldAlert className="h-4 w-4 text-amber-200 animate-pulse" />
+        {/* Card 4: Safety Gate */}
+        <div
+          onClick={() => {
+            setSelectedKpiCard('SAFETY');
+            setIsKpiModalOpen(true);
+          }}
+          className={`rounded-2xl bg-gradient-to-br from-amber-600 to-orange-700 text-white p-4.5 shadow-lg border transition-all cursor-pointer group hover:scale-[1.015] hover:shadow-2xl relative ${
+            activeKpiFilter === 'SAFETY'
+              ? 'ring-2 ring-amber-300 border-amber-300'
+              : 'border-amber-500/30 hover:border-amber-400/50'
+          }`}
+        >
+          <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-amber-100">
+            <span className="flex items-center gap-1.5">
+              <ShieldAlert className="h-3.5 w-3.5 text-amber-200 animate-pulse" />
+              Aviation Safety Gate
+            </span>
+            <span className="text-[9.5px] text-amber-200 bg-white/10 px-1.5 py-0.5 rounded">
+              FAR/JAR-25
+            </span>
           </div>
           <div className="text-2xl font-black mt-1 text-amber-50">
             {pendingSafetyApprovalCount} Deals
           </div>
           <div className="text-[11px] text-amber-200 mt-1">
-            Requires FAR/JAR-25 verification
+            Engineering & scanner verification
+          </div>
+          <div className="mt-3 pt-2.5 border-t border-amber-400/20 flex items-center justify-between text-[11px] font-bold text-amber-200 group-hover:text-white transition-colors">
+            <span className="flex items-center gap-1">
+              Audit Gate ({safetyPendingCount} {safetyPendingCount === 1 ? 'deal' : 'deals'})
+            </span>
+            <span className="flex items-center gap-0.5 text-amber-100 group-hover:translate-x-0.5 transition-transform text-[10.5px]">
+              Review & Sign Off <ChevronRight className="h-3.5 w-3.5" />
+            </span>
           </div>
         </div>
       </div>
@@ -370,17 +495,31 @@ export function KanbanBoard({ deals, onRefresh, onOpenNewDeal }: KanbanBoardProp
             <option value="PENDING">Safety Audit Required</option>
           </select>
 
-          {(searchQuery || companyTypeFilter !== 'ALL' || safetyFilter !== 'ALL') && (
+          {(searchQuery || companyTypeFilter !== 'ALL' || safetyFilter !== 'ALL' || activeKpiFilter !== 'ALL') && (
             <button
               onClick={() => {
                 setSearchQuery('');
                 setCompanyTypeFilter('ALL');
                 setSafetyFilter('ALL');
+                setActiveKpiFilter('ALL');
               }}
               className="px-2.5 py-1.5 text-xs rounded-lg text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 font-semibold cursor-pointer shrink-0"
             >
               Reset
             </button>
+          )}
+
+          {activeKpiFilter !== 'ALL' && (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-sky-50 dark:bg-sky-950/80 border border-sky-300 dark:border-sky-800 text-xs text-[#002B66] dark:text-sky-300 font-bold shrink-0">
+              <span>Card Filter: {activeKpiFilter.replace('_', ' ')}</span>
+              <button
+                onClick={() => setActiveKpiFilter('ALL')}
+                title="Clear Card Filter"
+                className="p-0.5 rounded hover:bg-sky-200 dark:hover:bg-sky-800 cursor-pointer"
+              >
+                <XCircle className="h-3.5 w-3.5" />
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -698,6 +837,42 @@ export function KanbanBoard({ deals, onRefresh, onOpenNewDeal }: KanbanBoardProp
           }}
           deal={selectedDealForEdit}
           onDealUpdated={onRefresh}
+        />
+      )}
+
+      {/* KPI Card Drilldown & Deal Management Modal */}
+      {isKpiModalOpen && selectedKpiCard && (
+        <KpiCardDrilldownModal
+          isOpen={isKpiModalOpen}
+          cardType={selectedKpiCard}
+          deals={deals}
+          onClose={() => {
+            setIsKpiModalOpen(false);
+            setSelectedKpiCard(null);
+          }}
+          onOpenNewDeal={onOpenNewDeal}
+          onRefresh={onRefresh}
+          onOpenBrief={(deal) => {
+            setSelectedDealForBrief(deal);
+            setIsBriefModalOpen(true);
+          }}
+          onEditDeal={(deal) => {
+            setSelectedDealForEdit(deal);
+            setIsEditModalOpen(true);
+          }}
+          onDeleteDeal={(deal) => {
+            setDealToDelete(deal);
+          }}
+          onCancelDeal={handleCancelDeal}
+          onStageChange={handleStageChange}
+          onApproveSafety={(deal) => {
+            setSelectedDealForSafety(deal);
+            setIsSafetyModalOpen(true);
+          }}
+          activeKpiFilter={activeKpiFilter}
+          onToggleKpiFilter={(type) => {
+            setActiveKpiFilter((prev) => (prev === type ? 'ALL' : type));
+          }}
         />
       )}
 
